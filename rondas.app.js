@@ -84,6 +84,9 @@
   // el bloqueo REAL e infranqueable vive en las Reglas de Firebase.
   async function verificarPlanRondas() {
     rondasHabilitadas = true;
+    // Estado por defecto: contenido operativo visible, aviso de bloqueo oculto.
+    var op0 = $('operativoRondas'); if (op0) op0.classList.remove('hidden');
+    var bq0 = $('bloqueoRondas'); if (bq0) bq0.classList.add('hidden');
     try {
       var url = URL_FIREBASE + '/config/plan.json';
       var res = await window.fetchConAuthRondas(url, { cache: 'no-store' });
@@ -104,9 +107,13 @@
   function bloquearRondas(mensaje) {
     rondasHabilitadas = false;
     detenerCamara();
+    // Oculta TODO el contenido operativo del escaner y muestra el aviso claro de
+    // "no disponible": no debe quedar ninguna función de Rondas a mano.
+    var op = $('operativoRondas'); if (op) op.classList.add('hidden');
+    var bq = $('bloqueoRondas'); if (bq) bq.classList.remove('hidden');
+    var bqMsg = $('bloqueoRondasMsg'); if (bqMsg) bqMsg.textContent = mensaje;
     var bi = $('btnIniciarEscaner'); if (bi) bi.disabled = true;
     var bd = $('btnDetenerEscaner'); if (bd) bd.disabled = true;
-    estado(mensaje, 'warn');
   }
 
   function mostrarLogin() {

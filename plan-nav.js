@@ -3,17 +3,17 @@
 // Script clásico, autohospedado (sin CDN) y CSP-safe (sin inline, sin unsafe-*,
 // solo addEventListener y clases ya horneadas en styles.css).
 //
-// Lee /config/plan con el idToken del usuario autenticado. Según las Reglas,
-// config/plan tiene .read = (auth != null), así que cualquier rol autenticado
-// (vigilador/supervisor/admin) puede leerlo; .write solo lo hace el Worker SA.
+// IMPORTANTE (fail-closed VISUAL): en el HTML los enlaces opcionales vienen con
+// la clase `hidden` por defecto. Este script SOLO los MUESTRA cuando logra leer
+// /config/plan (con el usuario autenticado) y confirma que la función está
+// incluida. Así, antes del login —cuando aún no hay token y no se puede leer el
+// plan— el enlace permanece oculto, que es justo lo deseado: no mostrar nada que
+// el plan no habilite.
 //
-// Esta capa es puramente VISUAL y ACOMPAÑA al candado DURO de las Reglas de
-// Firebase (que ya rechazan la escritura si el plan no incluye la función).
-//
-// Política: aplicamos el ocultamiento SOLO cuando logramos leer el plan de forma
-// definitiva. Si no hay token o no se pudo leer, no tocamos la nav (fail-open en
-// lo visual) porque la seguridad real ya la garantizan las Reglas; así evitamos
-// esconder opciones a un cliente legítimo por una sesión aún no restaurada.
+// Las Reglas de Firebase dan config/plan .read = (auth != null); por eso basta un
+// usuario autenticado (vigilador/supervisor/admin) para leerlo. Esta capa es
+// puramente VISUAL y ACOMPAÑA al candado DURO de las Reglas (que ya rechazan la
+// escritura si el plan no incluye la función).
 (function () {
   'use strict';
 
@@ -26,20 +26,19 @@
     'obtenerTokenSupervisor'
   ];
 
+  var aplicado = false;
+  var timer = null;
+
   function aplicar(funciones) {
     try {
       var marcados = document.querySelectorAll('nav [data-plan-funcion]');
       for (var i = 0; i < marcados.length; i++) {
         var el = marcados[i];
         var f = el.getAttribute('data-plan-funcion');
-        // Oculta si la función no está habilitada en el plan.
+        // Muestra solo si la función está habilitada; si no, la deja oculta.
         el.classList.toggle('hidden', !funciones[f]);
       }
     } catch (_) {}
-  }
-
-  function esperar(ms) {
-    return new Promise(function (r) { setTimeout(r, ms); });
   }
 
   function obtenerToken() {
@@ -56,40 +55,35 @@
     return cadena;
   }
 
-  function cargar() {
-    var token = null;
-    // La sesión de Firebase se restaura de forma asíncrona tras cargar la
-    // página: reintentamos unos segundos hasta tener un token, sin bloquear.
-    var paso = Promise.resolve();
-    for (var intento = 0; intento < 20; intento++) {
-      paso = paso.then(function () {
-        if (token) return null;
-        return obtenerToken().then(function (t) {
-          if (t) { token = t; return null; }
-          return esperar(400);
-        });
-      });
-    }
-
-    paso.then(function () {
-      if (!token) return; // Sin token: no tocamos la nav (fail-open visual).
+  function intentar() {
+    if (aplicado) return;
+    obtenerToken().then(function (token) {
+      if (!token) return; // Sin sesión aún: la nav sigue oculta (fail-closed).
       var url = URL_BASE + '/config/plan.json?ts=' + Date.now() +
                 '&auth=' + encodeURIComponent(token);
       return fetch(url, { cache: 'no-store' }).then(function (res) {
-        if (!res.ok) return; // No se pudo leer: no tocamos la nav.
+        if (!res.ok) return; // No se pudo leer: reintentamos más tarde.
         return res.json().then(function (p) {
           var funciones = (p && p.funciones && typeof p.funciones === 'object')
             ? p.funciones
-            : {}; // Plan leído pero sin funciones: oculta las opcionales.
+            : {}; // Plan leído sin funciones: todo opcional queda oculto.
           aplicar(funciones);
+          aplicado = true;
+          if (timer) { clearInterval(timer); timer = null; }
         });
       });
     }).catch(function () {});
   }
 
+  // Reintenta periódicamente para cubrir el caso de login POSTERIOR a la carga
+  // de la página (la sesión Firebase aparece tras loguearse). Se detiene al leer
+  // el plan una vez, y como tope de seguridad deja de reintentar a los 10 min.
+  timer = setInterval(intentar, 1500);
+  setTimeout(function () { if (timer) { clearInterval(timer); timer = null; } }, 600000);
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', cargar);
+    document.addEventListener('DOMContentLoaded', intentar);
   } else {
-    cargar();
+    intentar();
   }
 })();

@@ -39,7 +39,7 @@
           <i class="fa-solid fa-camera-retro text-emerald-400"></i>
           <span>Fichadas</span>
         </a>
-        <a href="rondas.html" data-plan-funcion="rondas" class="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg transition flex items-center space-x-1.5 shadow-sm">
+        <a href="rondas.html" data-plan-funcion="rondas" class="hidden px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg transition flex items-center space-x-1.5 shadow-sm">
           <i class="fa-solid fa-route text-emerald-400"></i>
           <span>Rondas</span>
         </a>
@@ -105,6 +105,15 @@
         </button>
       </div>
 
+      <!-- Bloqueo por plan: visible solo si el plan no incluye Rondas. -->
+      <div id="bloqueoRondas" class="hidden bg-amber-950 border border-amber-500 rounded-xl p-5 text-center space-y-2">
+        <i class="fa-solid fa-lock text-amber-400 text-2xl"></i>
+        <p id="bloqueoRondasMsg" class="text-sm text-amber-200">Rondas no está disponible en tu plan actual.</p>
+      </div>
+
+      <!-- Contenido operativo del escaner: se oculta si el plan no incluye Rondas. -->
+      <div id="operativoRondas" class="space-y-5">
+
       <!-- Instruccion -->
       <div class="bg-slate-900/60 border border-slate-700 rounded-xl p-4">
         <p class="text-sm text-slate-300"><i class="fa-solid fa-circle-info text-emerald-400 mr-1"></i> Apunta la camara al código QR del punto de control. El registro se guarda automáticamente al leerlo.</p>
@@ -142,6 +151,8 @@
           <p id="listaVaciaRondas" class="text-sm text-slate-500">Aún no registraste ningún punto.</p>
         </div>
       </div>
+
+      </div><!-- /#operativoRondas -->
 
     </div>
   </main>
