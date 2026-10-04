@@ -39,7 +39,7 @@
           <i class="fa-solid fa-camera-retro text-emerald-400"></i>
           <span>Fichadas</span>
         </a>
-        <a href="rondas.html" class="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg transition flex items-center space-x-1.5 shadow-sm">
+        <a href="rondas.html" data-plan-funcion="rondas" class="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg transition flex items-center space-x-1.5 shadow-sm">
           <i class="fa-solid fa-route text-emerald-400"></i>
           <span>Rondas</span>
         </a>
@@ -149,5 +149,7 @@
   <!-- Logica (script clasico) y modulo de sesion Firebase (ESM) -->
   <script src="rondas.app.js?v=20261004a"></script>
   <script type="module" src="rondas.module.js?v=20261004a"></script>
+  <!-- Capa visual: oculta en la nav las funciones que el plan no incluye. -->
+  <script src="plan-nav.js?v=20261005a"></script>
 </body>
 </html>

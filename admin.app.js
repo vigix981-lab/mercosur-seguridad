@@ -791,6 +791,11 @@ function cambiarTab(tab) {
     document.getElementById('tabBtnRondasReporte').className = "px-5 py-3 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition";
     cargarReporteRondas();
   }
+  // [PLAN] cambiarTab() reescribe por completo el className de cada boton de
+  // pestana (para pintar la activa), lo que BORRA la clase 'hidden' que puso
+  // aplicarFuncionesUI(). Por eso re-aplicamos las funciones del plan al final:
+  // las pestanas no incluidas en el plan vuelven a ocultarse al cambiar de tab.
+  aplicarFuncionesUI();
 }
 
 // ===================================================================

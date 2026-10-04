@@ -75,7 +75,56 @@ function mostrarPanel() {
   document.getElementById('contenidoPanel').classList.remove('hidden');
   cargarDatos();
   iniciarActualizacionAutomatica();
+  // [PLAN] Oculta en el panel del supervisor lo que el plan NO incluye
+  // (rondas, exportar). Se corre tras el login real (ya hay token para leer
+  // /config/plan). Fail-closed: si no se puede leer, se ocultan las opcionales.
+  cargarPlanPanel();
 }
+
+// ============================================================================
+//  [PLAN] GATING DE FUNCIONES EN EL PANEL DEL SUPERVISOR
+//  Lee /config/plan (solo lectura; lo escribe el Worker con la service account)
+//  y oculta los elementos con data-plan-funcion="X" cuyo plan no incluye X.
+//  Mismo criterio que admin.html: la capa visual acompana al candado DURO de
+//  las Reglas de Firebase. CSP-safe (sin inline), solo toggle de 'hidden'.
+// ============================================================================
+window.PLAN_VIGIX_PANEL = null;
+
+function planTieneFuncionPanel(nombre) {
+  var fn = (window.PLAN_VIGIX_PANEL && window.PLAN_VIGIX_PANEL.funciones) || {};
+  return !!fn[nombre];
+}
+window.planTieneFuncionPanel = planTieneFuncionPanel;
+
+function aplicarFuncionesUIPanel() {
+  try {
+    var marcados = document.querySelectorAll('[data-plan-funcion]');
+    for (var i = 0; i < marcados.length; i++) {
+      var el = marcados[i];
+      var f = el.getAttribute('data-plan-funcion');
+      el.classList.toggle('hidden', !planTieneFuncionPanel(f));
+    }
+  } catch (_) {}
+}
+window.aplicarFuncionesUIPanel = aplicarFuncionesUIPanel;
+
+async function cargarPlanPanel() {
+  try {
+    try { if (window.authListoPanel) await window.authListoPanel; } catch (_) {}
+    var res = await window.fetchConAuthPanel(`${URL_BASE_FIREBASE}/config/plan.json?ts=${Date.now()}`, { cache: 'no-store' });
+    var p = res && res.ok ? await res.json() : null;
+    window.PLAN_VIGIX_PANEL = {
+      nombre: (p && p.nombre) ? String(p.nombre) : 'esencial',
+      estado: (p && String(p.estado).toLowerCase() === 'suspendido') ? 'suspendido' : 'activo',
+      funciones: (p && p.funciones && typeof p.funciones === 'object') ? p.funciones : {}
+    };
+  } catch (_) {
+    // Fail-closed: sin plan legible, se ocultan las funciones opcionales.
+    window.PLAN_VIGIX_PANEL = window.PLAN_VIGIX_PANEL || { nombre: 'esencial', estado: 'activo', funciones: {} };
+  }
+  aplicarFuncionesUIPanel();
+}
+window.cargarPlanPanel = cargarPlanPanel;
 
 // Autoactualizacion del panel "Control en Tiempo Real" mediante polling
 // controlado (suficiente para la infraestructura gratuita actual). Solo
