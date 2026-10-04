@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Vigix: control operativo, asistencia y supervisión para empresas de seguridad.">
+  <meta name="description" content="Control operativo, fichadas con evidencia y supervisión para empresas de seguridad.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; style-src 'self'; img-src 'self' https://images.pexels.com; form-action 'self'; frame-ancestors 'none'">
   <title>Vigix | Control operativo para empresas de seguridad</title>
   <link rel="stylesheet" href="landing.css">
@@ -11,10 +11,10 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a class="brand" href="#inicio" aria-label="Vigix - Inicio">
+      <a class="brand" href="#inicio" aria-label="Inicio">
         <img src="assets/vigix-logo.svg" alt="Vigix">
       </a>
-      <nav class="public-nav" aria-label="Navegación comercial">
+      <nav class="public-nav" aria-label="Navegación principal">
         <a href="#funciones">Funciones</a>
         <a href="#planes">Planes</a>
         <a href="#contacto">Contacto</a>
@@ -24,97 +24,87 @@
   </header>
 
   <main>
-    <section id="inicio" class="hero" aria-labelledby="hero-title">
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <p class="eyebrow">Control operativo para seguridad privada</p>
-        <h1 id="hero-title">Supervisá tu operación desde una sola plataforma.</h1>
-        <p class="hero-copy">Fichadas con evidencia, trazabilidad y control central para equipos distribuidos.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#planes">Ver planes</a>
-          <a class="btn btn-secondary" href="#contacto">Contactar</a>
+    <section id="inicio" class="hero-stage" aria-labelledby="hero-title">
+      <div class="hero-shade"></div>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">Software para empresas de seguridad</p>
+          <h1 id="hero-title">Control de personal desde una central.</h1>
+          <p class="hero-subtitle">Fichadas con evidencia, geolocalización y supervisión operativa en tiempo real.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#planes">Ver planes</a>
+            <a class="btn btn-ghost" href="#contacto">Contactar</a>
+          </div>
+        </div>
+
+        <div id="planes" class="plans-dock" aria-label="Planes comerciales">
+          <article class="plan-card">
+            <div class="plan-top">
+              <span class="plan-badge">Esencial</span>
+              <strong>Hasta 10 vigiladores</strong>
+            </div>
+            <p>Control operativo básico para equipos pequeños.</p>
+            <ul>
+              <li>Fichadas con GPS y evidencia</li>
+              <li>Objetivos y turnos</li>
+              <li>Panel y reportes básicos</li>
+            </ul>
+          </article>
+
+          <article class="plan-card plan-featured">
+            <div class="plan-top">
+              <span class="plan-badge">Profesional</span>
+              <strong>Hasta 25 vigiladores</strong>
+            </div>
+            <p>Más supervisión, alertas y control interno.</p>
+            <ul>
+              <li>Incidencias y botón de pánico</li>
+              <li>Roles y biometría configurable</li>
+              <li>Exportación y alertas</li>
+            </ul>
+          </article>
+
+          <article class="plan-card">
+            <div class="plan-top">
+              <span class="plan-badge">Empresa</span>
+              <strong>Hasta 50 vigiladores</strong>
+            </div>
+            <p>Escala para operaciones con múltiples objetivos.</p>
+            <ul>
+              <li>Múltiples sedes y dispositivos</li>
+              <li>Modo offline autorizado</li>
+              <li>Reglas avanzadas y soporte prioritario</li>
+            </ul>
+          </article>
         </div>
       </div>
     </section>
 
-    <section id="funciones" class="section">
+    <section id="funciones" class="section compact-section">
       <div class="section-head">
         <p class="eyebrow">Funciones diferenciales</p>
-        <h2>Evidencia y control para cada operación.</h2>
-        <p>Información verificable para supervisar personal, objetivos y novedades desde central.</p>
+        <h2>Evidencia verificable para supervisar mejor.</h2>
       </div>
-
       <div class="feature-grid">
         <article class="feature-card">
-          <span class="feature-number">01</span>
+          <span>01</span>
           <h3>Fichadas con evidencia</h3>
-          <p>Registro con fotografía, ubicación y hora validada.</p>
+          <p>Fotografía, ubicación y hora validada.</p>
         </article>
         <article class="feature-card">
-          <span class="feature-number">02</span>
-          <h3>Identidad del dispositivo</h3>
-          <p>Mayor trazabilidad sobre el origen de cada marcación.</p>
+          <span>02</span>
+          <h3>Trazabilidad</h3>
+          <p>Identificación del dispositivo y registro de actividad.</p>
         </article>
         <article class="feature-card">
-          <span class="feature-number">03</span>
+          <span>03</span>
           <h3>Supervisión centralizada</h3>
-          <p>Seguimiento de personal y objetivos desde una vista operativa.</p>
+          <p>Seguimiento de personal, objetivos y novedades.</p>
         </article>
         <article class="feature-card">
-          <span class="feature-number">04</span>
+          <span>04</span>
           <h3>Alertas y auditoría</h3>
-          <p>Eventos relevantes, roles y registro de acciones para control interno.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="planes" class="section section-alt">
-      <div class="section-head">
-        <p class="eyebrow">Planes</p>
-        <h2>Una escala adecuada para cada operación.</h2>
-        <p>La capacidad y las funciones crecen junto con la estructura de la empresa.</p>
-      </div>
-
-      <div class="plans-grid">
-        <article class="plan-card">
-          <div>
-            <p class="plan-kicker">Hasta 10 vigiladores</p>
-            <h3>Esencial</h3>
-            <p class="plan-summary">Control básico para una operación acotada.</p>
-          </div>
-          <ul>
-            <li>Fichadas y GPS / geocerca</li>
-            <li>Objetivos y turnos</li>
-            <li>Panel, horas y reportes básicos</li>
-          </ul>
-        </article>
-
-        <article class="plan-card plan-featured">
-          <div>
-            <p class="plan-kicker">Hasta 25 vigiladores</p>
-            <h3>Profesional</h3>
-            <p class="plan-summary">Más control, alertas y herramientas de supervisión.</p>
-          </div>
-          <ul>
-            <li>Todo Esencial</li>
-            <li>Incidencias y botón de pánico</li>
-            <li>Roles y biometría configurable</li>
-            <li>Alertas y exportación PDF / Excel</li>
-          </ul>
-        </article>
-
-        <article class="plan-card">
-          <div>
-            <p class="plan-kicker">Hasta 50 vigiladores</p>
-            <h3>Empresa</h3>
-            <p class="plan-summary">Cobertura ampliada para estructuras con varios objetivos.</p>
-          </div>
-          <ul>
-            <li>Todo Profesional</li>
-            <li>Múltiples objetivos y dispositivos</li>
-            <li>Modo offline autorizado</li>
-            <li>Reglas avanzadas y soporte prioritario</li>
-          </ul>
+          <p>Eventos relevantes, roles y control de acciones.</p>
         </article>
       </div>
     </section>
@@ -123,43 +113,23 @@
       <div class="contact-copy">
         <p class="eyebrow">Contacto comercial</p>
         <h2>Contanos cómo trabaja tu operación.</h2>
-        <p>Dejá los datos básicos para definir la configuración adecuada.</p>
+        <p>Con estos datos se puede definir la configuración adecuada.</p>
       </div>
 
       <div class="contact-form" role="form" aria-label="Formulario comercial">
         <div class="field-grid">
-          <label>
-            <span>Nombre</span>
-            <input type="text" name="nombre" autocomplete="name">
-          </label>
-          <label>
-            <span>Empresa</span>
-            <input type="text" name="empresa" autocomplete="organization">
-          </label>
-          <label>
-            <span>Teléfono</span>
-            <input type="tel" name="telefono" autocomplete="tel">
-          </label>
-          <label>
-            <span>Email</span>
-            <input type="email" name="email" autocomplete="email">
-          </label>
-          <label class="full-width">
-            <span>Cantidad aproximada de personal</span>
-            <input type="number" name="personal" min="1" inputmode="numeric">
-          </label>
-          <label class="full-width">
-            <span>Observaciones / consulta</span>
-            <textarea name="consulta" rows="5"></textarea>
-          </label>
+          <label><span>Nombre</span><input type="text" name="nombre" autocomplete="name"></label>
+          <label><span>Empresa</span><input type="text" name="empresa" autocomplete="organization"></label>
+          <label><span>Teléfono</span><input type="tel" name="telefono" autocomplete="tel"></label>
+          <label><span>Email</span><input type="email" name="email" autocomplete="email"></label>
+          <label class="full-width"><span>Cantidad aproximada de personal</span><input type="number" name="personal" min="1" inputmode="numeric"></label>
+          <label class="full-width"><span>Observaciones / consulta</span><textarea name="consulta" rows="4"></textarea></label>
         </div>
-        <p class="form-note">El envío desde la web se habilitará cuando quede vinculado el canal comercial definitivo.</p>
+        <p class="form-note">El envío desde la web se habilitará cuando quede vinculado un destino comercial verificado.</p>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <span>Software de control operativo para empresas de seguridad.</span>
-  </footer>
+  <footer class="site-footer">Software de control operativo para empresas de seguridad.</footer>
 </body>
 </html>
