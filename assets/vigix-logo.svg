@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 300" role="img" aria-labelledby="t d">
+<title id="t">Vigix</title><desc id="d">Vigix - Control operativo y asistencia</desc>
+<defs>
+  <linearGradient id="r" x1="0" x2="1"><stop offset="0" stop-color="#ff151f"/><stop offset="1" stop-color="#c90016"/></linearGradient>
+  <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#3a4048"/><stop offset="1" stop-color="#15191f"/></linearGradient>
+</defs>
+<g transform="translate(20,18)">
+  <path d="M125 2 230 33v83c0 73-44 123-105 157C64 239 20 189 20 116V33Z" fill="url(#g)"/>
+  <path d="M125 2 20 33v83c0 73 44 123 105 157V188l-50-49 30-30 28 29 70-78 31 28-109 120Z" fill="url(#r)"/>
+  <path d="m82 127 43 43 79-91" fill="none" stroke="#ff1722" stroke-width="28" stroke-linecap="square" stroke-linejoin="miter"/>
+</g>
+<text x="290" y="152" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="132" font-style="italic" font-weight="800" letter-spacing="-6">Vigix</text>
+<path d="M850 70h54l-27 34z" fill="#ff1722"/>
+<text x="300" y="220" fill="#b9c0c9" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="400">Control operativo y asistencia</text>
+</svg>
