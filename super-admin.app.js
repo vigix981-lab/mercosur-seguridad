@@ -3,6 +3,24 @@
 // NO con Firebase. La clave NO se guarda: se lee del input en cada operación.
 var URL_WORKER = 'https://mercosur-seguridad.micasa27822024.workers.dev';
 
+// Combos de funciones recomendados por plan (igual que en el Worker).
+var FUNCIONES_PRESET = {
+  esencial:    { rondas:false, alertasIncidencias:false, rolesSupervision:false, exportarReportes:false, multiplesSedes:false, modoOffline:false },
+  profesional: { rondas:true,  alertasIncidencias:true,  rolesSupervision:true,  exportarReportes:true,  multiplesSedes:false, modoOffline:false },
+  empresa:     { rondas:true,  alertasIncidencias:true,  rolesSupervision:true,  exportarReportes:true,  multiplesSedes:true,  modoOffline:true  }
+};
+var FN_IDS = { rondas:'fnRondas', alertasIncidencias:'fnAlertas', rolesSupervision:'fnRoles', exportarReportes:'fnExport', multiplesSedes:'fnSedes', modoOffline:'fnOffline' };
+
+function leerFuncionesForm(){
+  var out = {};
+  for (var k in FN_IDS){ var el = $(FN_IDS[k]); out[k] = !!(el && el.checked); }
+  return out;
+}
+function pintarFuncionesForm(fn){
+  fn = fn || {};
+  for (var k in FN_IDS){ var el = $(FN_IDS[k]); if (el) el.checked = !!fn[k]; }
+}
+
 function $(id){ return document.getElementById(id); }
 function mostrarMsg(txt, tipo){
   var m = $('msg');
@@ -45,6 +63,7 @@ function cargarFormDesde(plan){
   $('inpEstado').value = (plan.estado === 'suspendido') ? 'suspendido' : 'activo';
   $('inpVig').value = Number.isFinite(plan.maxVigiladores) ? plan.maxVigiladores : 10;
   $('inpObj').value = Number.isFinite(plan.maxObjetivos) ? plan.maxObjetivos : 2;
+  pintarFuncionesForm(plan.funciones);
 }
 
 async function onLeer(){
@@ -72,11 +91,12 @@ async function aplicar(estadoForzado){
   if (!Number.isFinite(maxVig) || maxVig < 0 || !Number.isFinite(maxObj) || maxObj < 0){
     mostrarMsg('Los topes deben ser números enteros mayores o iguales a 0.', 'error'); return;
   }
+  var funciones = leerFuncionesForm();
   var etiqueta = (estado === 'suspendido') ? 'SUSPENDER la cuenta' : ('aplicar el plan “' + nombre + '” (' + maxVig + ' vig / ' + maxObj + ' obj)');
   if (!confirm('¿Confirmás ' + etiqueta + '?')) return;
   mostrarMsg('Guardando…', 'ok');
   try {
-    var r = await llamar({ accion:'ownerFijarPlan', ownerKey:k, nombre:nombre, estado:estado, maxVigiladores:maxVig, maxObjetivos:maxObj });
+    var r = await llamar({ accion:'ownerFijarPlan', ownerKey:k, nombre:nombre, estado:estado, maxVigiladores:maxVig, maxObjetivos:maxObj, funciones:funciones });
     if (r.data && r.data.ok){
       cargarFormDesde(r.data.plan);
       mostrarMsg('Plan guardado. Volvé a “Leer plan actual” para ver el uso en vivo.', 'ok');
@@ -95,6 +115,7 @@ function seleccionarPlan(ev){
   if (vig !== '') $('inpVig').value = vig;
   if (obj !== '') $('inpObj').value = obj;
   $('inpEstado').value = 'activo';
+  if (nombre !== 'custom' && FUNCIONES_PRESET[nombre]) pintarFuncionesForm(FUNCIONES_PRESET[nombre]);
   var all = document.querySelectorAll('.plan');
   for (var i=0;i<all.length;i++) all[i].classList.remove('plan-sel');
   b.classList.add('plan-sel');

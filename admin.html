@@ -38,6 +38,7 @@
        <div>
          <span class="text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase block">Mercosur Seguridad</span>
          <h1 class="text-lg font-bold text-white tracking-wide">Portal de Operaciones</h1>
+         <span id="badgePlanVigix" class="hidden mt-1 inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Plan</span>
        </div>
      </div>
 
@@ -50,7 +51,7 @@
           <i class="fa-solid fa-camera-retro text-emerald-400"></i>
           <span>Fichadas</span>
         </a>
-        <a href="rondas.html" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition flex items-center space-x-1.5">
+        <a href="rondas.html" data-plan-funcion="rondas" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition flex items-center space-x-1.5">
           <i class="fa-solid fa-route text-emerald-400"></i>
           <span>Rondas</span>
         </a>
@@ -366,6 +367,7 @@
       <div class="bg-slate-800 p-6 rounded-2xl border border-emerald-600/40 shadow-xl space-y-4">
         <h3 class="text-lg font-bold text-white flex items-center gap-2">
           <i class="fa-solid fa-user-shield text-emerald-400"></i> Agregar Empleado con Acceso
+          <span id="cupoVigiladoresTxt" class="hidden ml-auto text-xs font-bold px-2.5 py-1 rounded-full bg-slate-900 text-emerald-300 border border-slate-700" title="Vigiladores usados / tope de tu plan">0 / 0</span>
         </h3>
         <p class="text-xs text-slate-400">Registrá un nuevo empleado y su credencial de acceso. El horario y los objetivos se configuran luego desde <strong class="text-slate-200">Configurar</strong>.</p>
         <form id="formAltaEmpleado" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
@@ -459,6 +461,7 @@
         <div>
           <h3 class="text-lg font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-building-circle-check text-sky-500"></i> Registrar Nuevo Objetivo / Puesto
+            <span id="cupoObjetivosTxt" class="hidden ml-auto text-xs font-bold px-2.5 py-1 rounded-full bg-slate-900 text-sky-300 border border-slate-700" title="Objetivos usados / tope de tu plan">0 / 0</span>
           </h3>
           <p class="text-xs text-slate-400 mt-1">Escribí la dirección exacta. Podés buscarla en OpenStreetMap o abrirla directamente en Google Maps. Si Google Maps encuentra el domicilio, copiá sus coordenadas y pegálas abajo; también podés mover el marcador del mapa o cargar las coordenadas manualmente.</p>
         </div>

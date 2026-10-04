@@ -4,6 +4,117 @@ const URL_FIREBASE = "https://mercosur-seguridad-default-rtdb.firebaseio.com";
 // Si queda vacía, el cambio de PIN NO actualiza la clave de acceso (solo el hash local).
 const URL_WORKER_AUTH = "https://mercosur-seguridad.micasa27822024.workers.dev/";
 
+// ============================================================================
+//  [PLAN] TOPES POR PLAN CONTRATADO (indicadores + aviso de cupo en el panel)
+//  El plan lo fija EL DUENO del servicio desde su panel exclusivo (super-admin
+//  -> Worker, protegido por OWNER_KEY). Aqui el panel admin SOLO LEE el plan
+//  (/config/plan, lectura permitida por Reglas) para: (a) mostrar "X / maximo"
+//  y (b) avisar antes de intentar un alta. El candado DURO real vive en el
+//  Worker (crearEmpleadoDatos + verificarCupo), no se puede saltear.
+// ============================================================================
+window.PLAN_VIGIX = null;
+
+function nombreLegiblePlan(n) {
+  var m = { esencial: 'Esencial', profesional: 'Profesional', empresa: 'Empresa', custom: 'A medida' };
+  var k = String(n || '').toLowerCase();
+  return m[k] || (n ? (String(n).charAt(0).toUpperCase() + String(n).slice(1)) : 'Esencial');
+}
+
+// Lee /config/plan + refresca indicadores. Nunca interrumpe la carga si falla.
+async function cargarPlanVigix() {
+  try {
+    const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/config/plan.json?ts=${Date.now()}`), { cache: 'no-store' });
+    const p = await res.json();
+    const maxVig = Number(p && p.maxVigiladores);
+    const maxObj = Number(p && p.maxObjetivos);
+    window.PLAN_VIGIX = {
+      nombre: (p && p.nombre) ? String(p.nombre) : 'esencial',
+      maxVigiladores: (Number.isFinite(maxVig) && maxVig >= 0) ? maxVig : 10,
+      maxObjetivos: (Number.isFinite(maxObj) && maxObj >= 0) ? maxObj : 2,
+      estado: (p && String(p.estado).toLowerCase() === 'suspendido') ? 'suspendido' : 'activo',
+      funciones: (p && p.funciones && typeof p.funciones === 'object') ? p.funciones : {}
+    };
+  } catch (_) {
+    window.PLAN_VIGIX = window.PLAN_VIGIX || { nombre: 'esencial', maxVigiladores: 10, maxObjetivos: 2, estado: 'activo', funciones: {} };
+  }
+  actualizarIndicadoresPlan();
+  aplicarFuncionesUI();
+}
+
+// ¿El plan contratado incluye esta función opcional? (rondas, alertasIncidencias,
+// rolesSupervision, exportarReportes, multiplesSedes, modoOffline).
+function planTieneFuncion(nombre) {
+  const fn = (window.PLAN_VIGIX && window.PLAN_VIGIX.funciones) || {};
+  return !!fn[nombre];
+}
+window.planTieneFuncion = planTieneFuncion;
+
+// Muestra u oculta en pantalla lo que depende de una función del plan.
+// Convencion CSP-safe: cualquier elemento con data-plan-funcion="X" se oculta
+// (clase 'hidden') si el plan no tiene la funcion X. Ademas, oculta el selector
+// de rol cuando el plan no incluye "roles y supervision" (en Esencial todos los
+// altas son vigiladores).
+function aplicarFuncionesUI() {
+  try {
+    const marcados = document.querySelectorAll('[data-plan-funcion]');
+    for (let i = 0; i < marcados.length; i++) {
+      const el = marcados[i];
+      const f = el.getAttribute('data-plan-funcion');
+      el.classList.toggle('hidden', !planTieneFuncion(f));
+    }
+    // Selector de rol en el alta de empleados.
+    const selRol = document.getElementById('altaRol');
+    if (selRol) {
+      const permite = planTieneFuncion('rolesSupervision');
+      const cont = selRol.closest('div') || selRol.parentElement;
+      if (cont) cont.classList.toggle('hidden', !permite);
+      if (!permite) selRol.value = 'empleado';
+    }
+  } catch (_) {}
+}
+window.aplicarFuncionesUI = aplicarFuncionesUI;
+
+// Pinta el badge del plan (encabezado) y los contadores "X / max" de los forms.
+function actualizarIndicadoresPlan() {
+  const plan = window.PLAN_VIGIX || { nombre: 'esencial', maxVigiladores: 10, maxObjetivos: 2, estado: 'activo' };
+  const usadosVig = Array.isArray(datosPersonal) ? datosPersonal.length : 0;
+  const usadosObj = Array.isArray(datosObjetivos) ? datosObjetivos.length : 0;
+  const badge = document.getElementById('badgePlanVigix');
+  if (badge) {
+    const sufijo = plan.estado === 'suspendido' ? ' · SUSPENDIDO' : '';
+    badge.textContent = 'Plan ' + nombreLegiblePlan(plan.nombre) + sufijo;
+    badge.classList.toggle('vigix-plan-suspendido', plan.estado === 'suspendido');
+    badge.classList.remove('hidden');
+  }
+  const pintar = (idTxt, usados, max) => {
+    const el = document.getElementById(idTxt);
+    if (!el) return;
+    const topeTxt = (max > 0) ? String(max) : '\u221E';
+    el.textContent = usados + ' / ' + topeTxt;
+    const lleno = (max > 0 && usados >= max);
+    el.classList.toggle('vigix-cupo-lleno', lleno || plan.estado === 'suspendido');
+    el.classList.remove('hidden');
+  };
+  pintar('cupoVigiladoresTxt', usadosVig, plan.maxVigiladores);
+  pintar('cupoObjetivosTxt', usadosObj, plan.maxObjetivos);
+}
+
+// Consulta al Worker el cupo REAL (server-side) antes de un alta.
+// tipo: 'vigilador' | 'objetivo'. Devuelve la respuesta del Worker o null si
+// no se pudo consultar (en ese caso NO se bloquea: el candado duro del Worker
+// sigue protegiendo el alta de vigiladores).
+async function verificarCupoVigix(tipo) {
+  try {
+    return await window.llamarWorkerAdmin({ accion: 'verificarCupo', tipo: tipo });
+  } catch (e) {
+    console.warn('No se pudo verificar el cupo del plan:', e);
+    return null;
+  }
+}
+window.cargarPlanVigix = cargarPlanVigix;
+window.verificarCupoVigix = verificarCupoVigix;
+window.actualizarIndicadoresPlan = actualizarIndicadoresPlan;
+
 // --- REGISTRO DE AUDITORÍA (aditivo) ---
 // Deja constancia inmutable en /auditoria de cada cambio crítico (borrado/edición) hecho por el admin.
 // Usa el sello de tiempo del servidor y nunca interrumpe la operación principal si falla.
@@ -1300,6 +1411,9 @@ async function recargarDatosEfectivo() {
     // 0. Cargar configuración global (tolerancias + radio)
     await cargarConfiguracionGlobal();
 
+    // 0b. [PLAN] Cargar el plan contratado para los indicadores "X / maximo".
+    await cargarPlanVigix();
+
     // 1. Cargar Personal primero
     const resPersonal = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/personal.json`));
     const dataPersonal = await resPersonal.json();
@@ -1474,6 +1588,9 @@ async function recargarDatosEfectivo() {
       });
     }
     renderizarTablaObjetivos(datosObjetivos);
+
+    // [PLAN] Repintar indicadores con los conteos reales ya cargados.
+    try { actualizarIndicadoresPlan(); } catch (_) {}
 
   } catch (err) {
     console.error("Error al sincronizar con Firebase:", err);
@@ -2671,6 +2788,19 @@ async function guardarObjetivo(e) {
     alert('Primero buscá la dirección y seleccioná una ubicación válida. También podés usar el GPS actual.');
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus"></i> Añadir Objetivo'; return;
   }
+  // [PLAN] Chequeo de cupo server-side ANTES de crear el objetivo. El Worker
+  // cuenta los objetivos reales y aplica el tope del plan contratado.
+  try {
+    const cupo = await verificarCupoVigix('objetivo');
+    if (cupo && cupo.ok && cupo.disponible === false) {
+      if (cupo.suspendido) {
+        alert('La cuenta está suspendida por el proveedor del servicio. No se pueden crear objetivos. Contactá al proveedor.');
+      } else {
+        alert('Límite del plan alcanzado: tu plan "' + nombreLegiblePlan(cupo.plan && cupo.plan.nombre) + '" permite hasta ' + cupo.maximo + ' objetivos y ya hay ' + cupo.usados + '. Para sumar más, actualizá tu plan.');
+      }
+      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus"></i> Añadir Objetivo'; return;
+    }
+  } catch (_) { /* si la verificación falla, se continúa: el POST a Firebase decide */ }
   try {
     const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos.json`), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
