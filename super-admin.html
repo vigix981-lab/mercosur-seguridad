@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src https://mercosur-seguridad.micasa27822024.workers.dev; frame-ancestors 'none'">
+  <title>Panel del Dueño · Planes Vigix</title>
+  <link rel="stylesheet" href="super-admin.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="hd">
+      <span class="eyebrow">Mercosur Seguridad</span>
+      <h1>Panel del Dueño del Servicio</h1>
+      <p class="sub">Configurá el plan contratado de esta empresa (topes de vigiladores y objetivos). Esta pantalla es exclusiva del proveedor y pide la clave de dueño en cada uso — la clave no se guarda nunca.</p>
+    </header>
+
+    <section class="card">
+      <label class="lbl" for="ownerKey">Clave de dueño (OWNER_KEY)</label>
+      <input id="ownerKey" type="password" autocomplete="off" placeholder="Pegala para esta sesión" class="inp">
+      <p class="hint">No se almacena. Se envía solo al servidor para autorizar la operación.</p>
+      <button id="btnLeer" type="button" class="btn btn-sky">Leer plan actual</button>
+    </section>
+
+    <section id="estado" class="card estado hidden"></section>
+
+    <section class="card">
+      <h2>Elegir plan</h2>
+      <div class="planes">
+        <button type="button" class="plan" data-nombre="esencial" data-vig="10" data-obj="2">
+          <strong>Esencial</strong><span>10 vigiladores · 2 objetivos</span>
+        </button>
+        <button type="button" class="plan" data-nombre="profesional" data-vig="25" data-obj="4">
+          <strong>Profesional</strong><span>25 vigiladores · 4 objetivos</span>
+        </button>
+        <button type="button" class="plan" data-nombre="empresa" data-vig="50" data-obj="6">
+          <strong>Empresa</strong><span>50 vigiladores · 6 objetivos</span>
+        </button>
+        <button type="button" class="plan" data-nombre="custom" data-vig="" data-obj="">
+          <strong>A medida</strong><span>Topes personalizados</span>
+        </button>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label class="lbl" for="inpNombre">Nombre del plan</label>
+          <input id="inpNombre" type="text" class="inp" value="esencial">
+        </div>
+        <div>
+          <label class="lbl" for="inpEstado">Estado</label>
+          <select id="inpEstado" class="inp">
+            <option value="activo" selected>Activo</option>
+            <option value="suspendido">Suspendido</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" for="inpVig">Tope de vigiladores</label>
+          <input id="inpVig" type="number" min="0" step="1" class="inp" value="10">
+        </div>
+        <div>
+          <label class="lbl" for="inpObj">Tope de objetivos</label>
+          <input id="inpObj" type="number" min="0" step="1" class="inp" value="2">
+        </div>
+      </div>
+      <p class="hint">Un tope en 0 significa <strong>sin límite</strong>. “Suspendido” bloquea nuevas altas de vigiladores y objetivos de inmediato.</p>
+
+      <div class="acciones">
+        <button id="btnAplicar" type="button" class="btn btn-emerald">Aplicar plan</button>
+        <button id="btnSuspender" type="button" class="btn btn-red">Suspender cuenta</button>
+      </div>
+    </section>
+
+    <section id="msg" class="msg hidden"></section>
+    <footer class="ft">El candado real vive en el servidor: aunque el administrador intente saltear los topes, el servidor rechaza las altas por encima del plan.</footer>
+  </main>
+  <script src="super-admin.app.js"></script>
+</body>
+</html>
