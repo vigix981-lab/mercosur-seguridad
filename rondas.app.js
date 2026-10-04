@@ -23,6 +23,7 @@
   var escaneando = false;    // el loop esta activo
   var ultimoPorPunto = {};   // idPunto -> timestamp del ultimo registro OK
   var registrosSesion = [];  // historial visible de esta sesion
+  var rondasHabilitadas = true;  // guia amable: false si el plan no incluye Rondas
 
   // ---- Utilidades ----
   function $(id) { return document.getElementById(id); }
@@ -74,6 +75,38 @@
     if (panel) panel.classList.remove('hidden');
     var lbl = $('lblSesionRondas');
     if (lbl) lbl.textContent = sesion && sesion.legajo ? ('Legajo ' + sesion.legajo) : '—';
+    // Guia amable: consultar si el plan de la empresa incluye Rondas.
+    verificarPlanRondas();
+  }
+
+  // Lee config/plan y, si Rondas no esta incluida o la cuenta esta suspendida,
+  // muestra un mensaje claro y deshabilita el escaner. Es solo una guia de UX:
+  // el bloqueo REAL e infranqueable vive en las Reglas de Firebase.
+  async function verificarPlanRondas() {
+    rondasHabilitadas = true;
+    try {
+      var url = URL_FIREBASE + '/config/plan.json';
+      var res = await window.fetchConAuthRondas(url, { cache: 'no-store' });
+      if (!res || !res.ok) return;  // ante la duda, dejamos que las Reglas decidan
+      var plan = await res.json();
+      if (!plan) return;
+      var incluyeRondas = !!(plan.funciones && plan.funciones.rondas === true);
+      var suspendido = plan.estado === 'suspendido';
+      if (suspendido) {
+        bloquearRondas('Tu cuenta está suspendida. Rondas no está disponible hasta regularizar el plan.');
+      } else if (!incluyeRondas) {
+        bloquearRondas('Tu plan actual no incluye Rondas. Pedile al administrador que active la función en el plan Profesional o Empresa.');
+      }
+    } catch (_) { /* sin red: dejamos que las Reglas decidan al registrar */ }
+  }
+
+  // Deshabilita el escaner y avisa en pantalla con un mensaje claro.
+  function bloquearRondas(mensaje) {
+    rondasHabilitadas = false;
+    detenerCamara();
+    var bi = $('btnIniciarEscaner'); if (bi) bi.disabled = true;
+    var bd = $('btnDetenerEscaner'); if (bd) bd.disabled = true;
+    estado(mensaje, 'warn');
   }
 
   function mostrarLogin() {
@@ -149,6 +182,10 @@
   // ---- Camara + escaneo ----
   async function iniciarCamara() {
     if (escaneando) return;
+    if (!rondasHabilitadas) {
+      estado('Rondas no está disponible en tu plan actual.', 'warn');
+      return;
+    }
     if (typeof window.jsQR !== 'function') {
       estado('El lector de QR aún se está cargando. Reintentá en unos segundos.', 'error');
       return;
