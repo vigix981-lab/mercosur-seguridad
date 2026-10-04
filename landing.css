@@ -87,12 +87,9 @@ button,input,textarea{font:inherit}
   background:radial-gradient(circle at 75% 45%,transparent 0 18%,rgba(0,0,0,.13) 50%,rgba(0,0,0,.35) 100%);
 }
 .hero-content{
-  width:min(760px,calc(100% - 48px));
-  max-width:var(--max);
+  width:min(var(--max),calc(100% - 48px));
   margin:0 auto;
   padding:74px 0 110px;
-  justify-self:center;
-  transform:translateX(calc((min(1180px, 100vw - 48px) - min(760px, 100vw - 48px)) / -2));
 }
 .eyebrow{
   margin:0 0 14px;
@@ -159,13 +156,13 @@ button,input,textarea{font:inherit}
   max-width:720px;
   margin-bottom:40px;
 }
-.section-head h2,.contact-copy h2,.access-strip h2{
+.section-head h2,.contact-copy h2{
   margin:0;
   font-size:clamp(2rem,4vw,3.3rem);
   line-height:1.05;
   letter-spacing:-.035em;
 }
-.section-head>p:last-child,.contact-copy>p:last-child,.access-strip p{
+.section-head>p:last-child,.contact-copy>p:last-child{
   color:var(--muted);
   margin:16px 0 0;
   font-size:1.04rem;
@@ -275,20 +272,6 @@ textarea{resize:vertical}
   color:#7f8998;
   font-size:.8rem;
 }
-.access-strip{
-  max-width:var(--max);
-  margin:0 auto 80px;
-  padding:34px;
-  border:1px solid rgba(239,35,60,.35);
-  border-radius:22px;
-  background:linear-gradient(120deg,#0d131e,#130b10);
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:28px;
-}
-.access-strip h2{font-size:1.75rem}
-.access-strip p{margin-top:6px}
 .site-footer{
   border-top:1px solid var(--line);
   padding:28px 24px 38px;
@@ -299,7 +282,7 @@ textarea{resize:vertical}
 @media(max-width:900px){
   .header-inner{align-items:flex-start}
   .public-nav{gap:8px 12px}
-  .hero-content{transform:none;width:min(720px,calc(100% - 40px));}
+  .hero-content{width:min(720px,calc(100% - 40px));}
   .feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .plans-grid{grid-template-columns:1fr}
   .plan-card{min-height:auto}
@@ -321,8 +304,6 @@ textarea{resize:vertical}
   .field-grid{grid-template-columns:1fr}
   .full-width{grid-column:auto}
   .contact-form{padding:20px}
-  .access-strip{margin:0 18px 54px;padding:24px;flex-direction:column;align-items:flex-start}
-  .btn-outline{width:100%}
 }
 @media(max-width:460px){
   .public-nav>a:not(.system-link){display:none}
