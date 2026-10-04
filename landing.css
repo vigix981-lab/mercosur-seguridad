@@ -456,6 +456,46 @@ textarea{
 }
 
 @media(max-width:760px){
+  /* Mobile overflow guard */
+  html,
+  body{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+  .site-header,
+  main,
+  .hero,
+  .section,
+  .section-plans,
+  .site-footer{
+    max-width:100%;
+  }
+
+  .header-inner,
+  .public-nav,
+  .hero-content,
+  .hero-actions,
+  .feature-grid,
+  .plans-grid,
+  .contact-section,
+  .contact-form,
+  .field-grid,
+  .feature-card,
+  .plan-card{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .public-nav a,
+  .btn,
+  input,
+  textarea{
+    min-width:0;
+    max-width:100%;
+  }
+
   html{scroll-padding-top:130px}
 
   .header-inner{
