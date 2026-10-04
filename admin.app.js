@@ -78,6 +78,7 @@ let datosFiltradosMarcaciones = [];
 let paginaActualMarcaciones = 1;
 let filasPorPaginaMarcaciones = 25;
 let datosPersonal = [];
+let mapaRolesUsuarios = {};  // uid -> rol ('empleado' | 'supervisor' | 'admin'). Para separar la lista.
 let datosObjetivos = [];
 let mapaConfiguracionPersonal = {};
 let asignacionesTurnosAdmin = [];
@@ -97,7 +98,7 @@ let alertasFichadasCache = [];
 let alertasFichadasConocidas = new Set();
 let alertasFichadasInicializadas = false;
 // Configuración global de reglas laborales y radio de fichaje (persistida en Firebase /configuracionGlobal).
-let configGlobalAdmin = { toleranciaIngresoMin: 15, toleranciaEgresoMin: 30, radioFichajeMetros: 100, modoDispositivo: 'compartido', biometriaEstricta: false, precisionMaximaMetros: 0, offlineHabilitado: false, ventanaLoteOfflineHoras: 168 };
+let configGlobalAdmin = { toleranciaIngresoMin: 15, toleranciaEgresoMin: 30, radioFichajeMetros: 100, modoDispositivo: 'compartido', biometriaEstricta: false, precisionMaximaMetros: 0, offlineHabilitado: false, ventanaLoteOfflineHoras: 168, antiReplaySegundos: 90, skewRelojOfflineSegundos: 300 };
 
 function iniciarSonidoSirena() {
   if (audioCtxPanico) return; 
@@ -179,7 +180,7 @@ function activarModalPanico(id, datos) {
   document.getElementById('panicoNombre').innerText = datos.nombre || 'Vigilador No Especificado';
   document.getElementById('panicoDetalle').innerText = `Legajo: ${datos.legajo || '-'} | Objetivo: ${datos.objetivo || '-'}`;
   
-  const horaStr = datos.fechaHora ? new Date(datos.fechaHora).toLocaleString('es-AR', { hour12: false }) : ((datos.timestampServidor || datos.timestamp) ? new Date(datos.timestampServidor || datos.timestamp).toLocaleString('es-AR', { hour12: false }) : new Date().toLocaleString('es-AR', { hour12: false }));
+  const horaStr = datos.fechaHora ? new Date(datos.fechaHora).toLocaleString('es-AR', { hour12: false }) : ((datos.timestampServidor || datos.timestampEstimadoDispositivo || datos.timestamp) ? new Date(datos.timestampServidor || datos.timestampEstimadoDispositivo || datos.timestamp).toLocaleString('es-AR', { hour12: false }) : new Date().toLocaleString('es-AR', { hour12: false }));
   document.getElementById('panicoHora').innerText = `Activado a las: ${horaStr}`;
 
   const linkGps = document.getElementById('panicoMapaUrl');
@@ -396,19 +397,152 @@ function generarPinEmpleado() {
   const RANGO = 900000; // 999999 - 100000 + 1
   const LIMITE = Math.floor(0x100000000 / RANGO) * RANGO; // umbral anti-sesgo
   const buf = new Uint32Array(1);
-  let n;
+  let n, pin;
+  // Reintenta hasta obtener un PIN que ademas pase el filtro de fortaleza
+  // (descarta por azar 1234, 111111, 123456, etc.), manteniendo equiprobabilidad.
   do {
-    crypto.getRandomValues(buf);
-    n = buf[0];
-  } while (n >= LIMITE);
-  const pin = String(100000 + (n % RANGO));
+    do {
+      crypto.getRandomValues(buf);
+      n = buf[0];
+    } while (n >= LIMITE);
+    pin = String(100000 + (n % RANGO));
+  } while (window.validarFortalezaPin && !window.validarFortalezaPin(pin).ok);
   const inputPin = document.getElementById('altaPin');
   if (inputPin) inputPin.value = pin;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+//  COMPROBANTE DE CREDENCIALES (PIN) — patron "mostrar una sola vez".
+//  El PIN NUNCA se guarda en texto plano. En el UNICO instante en que se
+//  conoce (alta o cambio de PIN, dentro del navegador del admin) se muestra
+//  este comprobante para descargarlo en PDF / imprimirlo / copiarlo y
+//  entregarselo al empleado. No se persiste en ningun lado: si se pierde, se
+//  resetea el PIN desde "Configurar" y se reemite. Asi se tiene un registro
+//  entregable SIN crear la vulnerabilidad de almacenar PINs recuperables.
+// ────────────────────────────────────────────────────────────────────────────
+var _comprobantePinActual = null;
+
+function etiquetaRolComprobante(rol) {
+  return rol === 'admin' ? 'Administrador'
+       : rol === 'supervisor' ? 'Supervisor'
+       : 'Empleado (vigilador)';
+}
+
+// Abre el comprobante con los datos recien generados. 'modo': 'alta' | 'cambio'.
+function mostrarComprobantePin(datos) {
+  datos = datos || {};
+  const pin = String(datos.pin || '').trim();
+  const legajo = String(datos.legajo || '').trim();
+  const nombre = String(datos.nombre || '').trim();
+  const rol = String(datos.rol || 'empleado').trim();
+  const modo = datos.modo === 'cambio' ? 'cambio' : 'alta';
+  const fecha = new Date().toLocaleString('es-AR', { hour12: false });
+  _comprobantePinActual = { pin, legajo, nombre, rol, modo, fecha };
+
+  const modal = document.getElementById('modalComprobantePin');
+  if (!modal) { // Fallback si esta version del HTML no tiene el modal.
+    alert('PIN de ' + nombre + ' (legajo ' + legajo + '): ' + pin + '\n\nAnotalo AHORA: no se vuelve a mostrar.');
+    return;
+  }
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('comprobanteNombre', nombre || '—');
+  set('comprobanteLegajo', legajo || '—');
+  set('comprobantePin', pin || '—');
+  set('comprobanteRol', etiquetaRolComprobante(rol));
+  set('comprobanteFecha', fecha);
+  const titulo = document.getElementById('comprobanteTitulo');
+  if (titulo) titulo.textContent = modo === 'cambio' ? 'PIN actualizado' : 'Nuevo acceso creado';
+  modal.classList.remove('hidden');
+}
+window.mostrarComprobantePin = mostrarComprobantePin;
+
+function cerrarComprobantePin() {
+  const modal = document.getElementById('modalComprobantePin');
+  if (modal) modal.classList.add('hidden');
+  _comprobantePinActual = null;
+}
+
+function copiarComprobantePin() {
+  if (!_comprobantePinActual) return;
+  const d = _comprobantePinActual;
+  const texto = 'Acceso Mercosur Seguridad / Vigix\n'
+    + 'Nombre: ' + d.nombre + '\n'
+    + 'Legajo: ' + d.legajo + '\n'
+    + 'PIN: ' + d.pin + '\n'
+    + 'Rol: ' + etiquetaRolComprobante(d.rol) + '\n'
+    + 'Emitido: ' + d.fecha;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(function(){ avisarCopiaComprobante(true); }, function(){ avisarCopiaComprobante(false); });
+  } else {
+    avisarCopiaComprobante(false);
+  }
+}
+
+function avisarCopiaComprobante(ok) {
+  const btn = document.getElementById('btnComprobanteCopiar');
+  if (!btn) return;
+  if (!btn.dataset.orig) btn.dataset.orig = btn.innerHTML;
+  btn.innerHTML = ok ? '<i class="fa-solid fa-check"></i> ¡Copiado!' : '<i class="fa-solid fa-triangle-exclamation"></i> Copialo a mano';
+  setTimeout(function(){ btn.innerHTML = btn.dataset.orig; }, 2500);
+}
+
+// Imprime SOLO el comprobante (CSS @media print en styles.css lo aisla).
+function imprimirComprobantePin() {
+  document.body.classList.add('print-comprobante');
+  const limpiar = function(){ document.body.classList.remove('print-comprobante'); window.removeEventListener('afterprint', limpiar); };
+  window.addEventListener('afterprint', limpiar);
+  setTimeout(function(){ try { window.print(); } catch (e) {} setTimeout(limpiar, 1500); }, 50);
+}
+
+// Genera un PDF descargable con jsPDF (ya se usa para los reportes).
+async function descargarComprobantePinPDF() {
+  if (!_comprobantePinActual) return;
+  const d = _comprobantePinActual;
+  const btn = document.getElementById('btnComprobantePDF');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...'; }
+  try {
+    await lazyExport();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setDrawColor(16, 185, 129); doc.setLineWidth(0.8); doc.rect(14, 16, 182, 112);
+    doc.setFontSize(10); doc.setTextColor(16, 185, 129);
+    doc.text('DEMO ASISTENCIA S.A. · VIGIX', 20, 26);
+    doc.setFontSize(18); doc.setTextColor(20, 20, 20);
+    doc.text('Comprobante de acceso', 20, 38);
+    doc.setFontSize(10); doc.setTextColor(90, 90, 90);
+    doc.text('Entregar al empleado. Documento confidencial.', 20, 45);
+    doc.setDrawColor(220); doc.line(20, 50, 190, 50);
+    doc.setFontSize(12);
+    let y = 62;
+    const fila = function(etq, val){ doc.setTextColor(120,120,120); doc.text(etq, 20, y); doc.setTextColor(20,20,20); doc.text(String(val || '—'), 70, y); y += 11; };
+    fila('Nombre:', d.nombre);
+    fila('Legajo:', d.legajo);
+    fila('Rol:', etiquetaRolComprobante(d.rol));
+    doc.setTextColor(120,120,120); doc.text('PIN de acceso:', 20, y);
+    doc.setFontSize(22); doc.setTextColor(16, 120, 80); doc.text(String(d.pin || '—'), 70, y + 1);
+    doc.setFontSize(9); y += 14;
+    doc.setTextColor(120,120,120); doc.text('Emitido: ' + d.fecha, 20, y);
+    doc.setFontSize(8); doc.setTextColor(140,140,140);
+    doc.text('El PIN no se almacena en texto plano. Si se extravia, el administrador puede resetearlo y', 20, 118);
+    doc.text('reemitir este comprobante. Ingreso del empleado: legajo + PIN.', 20, 122);
+    const nombreArch = ('Acceso_' + (d.legajo || 'empleado') + '_' + new Date().toISOString().slice(0,10) + '.pdf').replace(/[^\w.\-]+/g, '_');
+    doc.save(nombreArch);
+  } catch (e) {
+    alert('No se pudo generar el PDF: ' + ((e && e.message) || e) + '\nPodes imprimir o copiar los datos como alternativa.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 function validarPasswordAdmin(e) {
   e.preventDefault();
-  const email = (document.getElementById('inputEmailAdmin') ? document.getElementById('inputEmailAdmin').value : '').trim();
+  let email = (document.getElementById('inputEmailAdmin') ? document.getElementById('inputEmailAdmin').value : '').trim();
+  // Ingreso simplificado: si la persona escribio SOLO el legajo (sin "@"), le
+  // agregamos el dominio sintetico que usan los usuarios creados desde el panel
+  // ("legajo@mercosurseg.com"). Si escribio un correo completo (ej: admin@vigix.com,
+  // creados a mano en la base), se respeta tal cual. Asi conviven ambos.
+  if (email && email.indexOf('@') === -1) email = email + '@mercosurseg.com';
   const input = document.getElementById('inputPassAdmin').value;
   const errorMsg = document.getElementById('msgErrorPassAdmin');
   errorMsg.classList.add('hidden');
@@ -438,6 +572,8 @@ function validarPasswordAdmin(e) {
         if (email) sessionStorage.setItem('email_admin', email);
         mostrarAdmin();
       } else {
+        // El Worker ya aplica el bloqueo y arma el mensaje (bloqueo o intentos
+        // restantes). El cliente solo lo muestra.
         errorMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + ((res && res.mensaje) || 'Correo o contraseña incorrectos.');
         errorMsg.classList.remove('hidden');
         document.getElementById('inputPassAdmin').value = '';
@@ -499,6 +635,7 @@ function cambiarTab(tab) {
   document.getElementById('tabObjetivos').classList.add('hidden');
   document.getElementById('tabDispositivos').classList.add('hidden');
   document.getElementById('tabConfiguracion').classList.add('hidden');
+  { var _tRR = document.getElementById('tabRondasReporte'); if (_tRR) _tRR.classList.add('hidden'); }
 
   document.getElementById('tabBtnMarcaciones').className = "px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition";
   document.getElementById('tabBtnAlertasUbicacion').className = "px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition";
@@ -509,6 +646,7 @@ function cambiarTab(tab) {
 
   document.getElementById('tabBtnDispositivos').className = "px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition";
   document.getElementById('tabBtnConfiguracion').className = "px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition";
+  { var _bRR = document.getElementById('tabBtnRondasReporte'); if (_bRR) _bRR.className = "px-5 py-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition"; }
   if (tab === 'marcaciones') {
     document.getElementById('tabMarcaciones').classList.remove('hidden');
     document.getElementById('tabBtnMarcaciones').className = "px-5 py-3 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition";
@@ -537,7 +675,180 @@ function cambiarTab(tab) {
     document.getElementById('tabConfiguracion').classList.remove('hidden');
     document.getElementById('tabBtnConfiguracion').className = "px-5 py-3 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition";
     aplicarConfigGlobalAInputs();
+  } else if (tab === 'rondasReporte') {
+    document.getElementById('tabRondasReporte').classList.remove('hidden');
+    document.getElementById('tabBtnRondasReporte').className = "px-5 py-3 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition";
+    cargarReporteRondas();
   }
+}
+
+// ===================================================================
+//  PASO 3 - REPORTE DE RONDAS (admin / supervisor)   [ADITIVO, SOLO LECTURA]
+//  Lee el nodo rondasRegistros (append-only, lo que escanea el vigilador) y
+//  lo cruza con objetivos (nombre legible) y personal (nombre del vigilador por
+//  legajo). No escribe nada ni toca ninguna otra pestana. Admin y supervisor
+//  pueden leer el nodo completo (ver database.rules.json -> rondasRegistros).
+// ===================================================================
+var _reporteRondasCache = [];
+var _nombresObjetivosRonda = {};
+var _nombresVigiladoresRonda = {};
+
+async function cargarReporteRondas() {
+  var estado = document.getElementById('estadoReporteRondas');
+  if (estado) { estado.textContent = 'Cargando registros de rondas\u2026'; estado.className = 'text-xs text-slate-400'; }
+  try {
+    // Mapa idObjetivo -> nombre legible.
+    try {
+      var resObj = await fetch(await window.urlConAuthAdmin(URL_FIREBASE + '/objetivos.json?ts=' + Date.now()), { cache: 'no-store' });
+      var dataObj = resObj.ok ? await resObj.json() : null;
+      _nombresObjetivosRonda = {};
+      if (dataObj) Object.keys(dataObj).forEach(function (id) {
+        var d = dataObj[id];
+        _nombresObjetivosRonda[id] = (typeof d === 'string') ? d : ((d && d.nombre) || id);
+      });
+    } catch (_) {}
+    // Mapa legajo -> nombre del vigilador.
+    try {
+      var resPer = await fetch(await window.urlConAuthAdmin(URL_FIREBASE + '/personal.json?ts=' + Date.now()), { cache: 'no-store' });
+      var dataPer = resPer.ok ? await resPer.json() : null;
+      _nombresVigiladoresRonda = {};
+      if (dataPer) Object.keys(dataPer).forEach(function (id) {
+        var p = dataPer[id];
+        if (p && p.legajo != null) _nombresVigiladoresRonda[String(p.legajo)] = p.nombre || '';
+      });
+    } catch (_) {}
+    // Registros de rondas (nodo completo; admin/supervisor).
+    var res = await fetch(await window.urlConAuthAdmin(URL_FIREBASE + '/rondasRegistros.json?ts=' + Date.now()), { cache: 'no-store' });
+    if (!res.ok) {
+      if (estado) {
+        estado.textContent = (res.status === 401 || res.status === 403)
+          ? 'Sin permiso para leer las rondas. Revis\u00e1 que las Reglas (nodo rondasRegistros) est\u00e9n desplegadas.'
+          : ('No se pudieron cargar las rondas (error ' + res.status + ').');
+        estado.className = 'text-xs text-rose-400';
+      }
+      _reporteRondasCache = [];
+      renderReporteRondas();
+      return;
+    }
+    var data = await res.json();
+    var arr = [];
+    if (data) Object.keys(data).forEach(function (id) {
+      var r = data[id] || {};
+      r._id = id;
+      arr.push(r);
+    });
+    // Mas recientes primero.
+    arr.sort(function (a, b) { return (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0); });
+    _reporteRondasCache = arr;
+    poblarFiltroObjetivosRonda();
+    renderReporteRondas();
+  } catch (e) {
+    if (estado) { estado.textContent = 'Error al cargar las rondas. Reintent\u00e1.'; estado.className = 'text-xs text-rose-400'; }
+    _reporteRondasCache = [];
+    renderReporteRondas();
+  }
+}
+
+function fmtFechaHoraRonda(iso) {
+  var ms = Date.parse(iso);
+  if (!ms) return '-';
+  try {
+    return new Date(ms).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (_) { return new Date(ms).toISOString(); }
+}
+
+function fechaLocalISORonda(iso) {
+  var ms = Date.parse(iso); if (!ms) return '';
+  var d = new Date(ms);
+  var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+  var dd = ('0' + d.getDate()).slice(-2);
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+function poblarFiltroObjetivosRonda() {
+  var sel = document.getElementById('filtroObjetivoRonda');
+  if (!sel) return;
+  var prev = sel.value;
+  var ids = {};
+  _reporteRondasCache.forEach(function (r) { if (r.idObjetivo) ids[r.idObjetivo] = true; });
+  var html = '<option value="">Todos los objetivos</option>';
+  Object.keys(ids).forEach(function (id) {
+    var nombre = _nombresObjetivosRonda[id] || id;
+    html += '<option value="' + escaparHtml(id) + '">' + escaparHtml(nombre) + '</option>';
+  });
+  sel.innerHTML = html;
+  if (prev) sel.value = prev;
+}
+
+function limpiarFiltrosRonda() {
+  var fo = document.getElementById('filtroObjetivoRonda'); if (fo) fo.value = '';
+  var ff = document.getElementById('filtroFechaRonda'); if (ff) ff.value = '';
+  var fl = document.getElementById('filtroLegajoRonda'); if (fl) fl.value = '';
+  renderReporteRondas();
+}
+
+function renderReporteRondas() {
+  var cuerpo = document.getElementById('cuerpoReporteRondas');
+  var estado = document.getElementById('estadoReporteRondas');
+  if (!cuerpo) return;
+  var fObj = (document.getElementById('filtroObjetivoRonda') || {}).value || '';
+  var fFecha = (document.getElementById('filtroFechaRonda') || {}).value || '';
+  var fLeg = ((document.getElementById('filtroLegajoRonda') || {}).value || '').trim();
+
+  var filtrados = _reporteRondasCache.filter(function (r) {
+    if (fObj && r.idObjetivo !== fObj) return false;
+    if (fLeg && String(r.legajo || '') !== fLeg) return false;
+    if (fFecha && fechaLocalISORonda(r.timestamp) !== fFecha) return false;
+    return true;
+  });
+
+  var total = filtrados.length, fueraRadio = 0, sinGps = 0;
+  filtrados.forEach(function (r) {
+    if (!r.gpsDisponible) sinGps++;
+    else if (!r.ubicacionValidada) fueraRadio++;
+  });
+  var elTot = document.getElementById('resumenRondasTotal'); if (elTot) elTot.textContent = total;
+  var elFR = document.getElementById('resumenRondasFuera'); if (elFR) elFR.textContent = fueraRadio;
+  var elSG = document.getElementById('resumenRondasSinGps'); if (elSG) elSG.textContent = sinGps;
+
+  if (estado) {
+    estado.textContent = total ? (total + ' paso(s) de ronda') : 'No hay pasos de ronda para los filtros elegidos.';
+    estado.className = 'text-xs text-slate-400';
+  }
+
+  if (!total) {
+    cuerpo.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">No hay pasos de ronda registrados.</td></tr>';
+    return;
+  }
+
+  var html = '';
+  filtrados.forEach(function (r) {
+    var nombreObj = _nombresObjetivosRonda[r.idObjetivo] || r.idObjetivo || '-';
+    var nombreVig = _nombresVigiladoresRonda[String(r.legajo)] || '';
+    var ubicHtml;
+    if (!r.gpsDisponible) {
+      ubicHtml = '<span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold border border-slate-500/30 text-slate-400 bg-slate-500/10">Sin GPS</span>';
+    } else if (r.ubicacionValidada) {
+      ubicHtml = '<span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold border border-emerald-500/30 text-emerald-400 bg-emerald-500/10">En el punto' + (r.distanciaMetros != null ? ' \u00b7 ' + r.distanciaMetros + ' m' : '') + '</span>';
+    } else {
+      ubicHtml = '<span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold border border-amber-500/30 text-amber-400 bg-amber-500/10">Fuera de radio' + (r.distanciaMetros != null ? ' \u00b7 ' + r.distanciaMetros + ' m' : '') + '</span>';
+    }
+    var mapaHtml = '';
+    if (r.latitud != null && r.longitud != null) {
+      var mapa = 'https://www.google.com/maps?q=' + encodeURIComponent(r.latitud + ',' + r.longitud);
+      mapaHtml = '<a href="' + escaparHtml(mapa) + '" target="_blank" rel="noopener" class="text-xs text-sky-400 hover:underline"><i class="fa-solid fa-map-location-dot"></i> Ver mapa</a>';
+    }
+    html +=
+      '<tr class="hover:bg-slate-800/40">' +
+        '<td class="p-3 text-slate-300 whitespace-nowrap">' + escaparHtml(fmtFechaHoraRonda(r.timestamp)) + '</td>' +
+        '<td class="p-3 text-slate-200">' + escaparHtml(nombreObj) + '</td>' +
+        '<td class="p-3 font-medium text-white">' + escaparHtml(r.nombrePunto || r.idPunto || '-') + '</td>' +
+        '<td class="p-3 text-slate-300">' + escaparHtml(nombreVig || '\u2014') + '<br><span class="text-xs text-slate-500">Leg: ' + escaparHtml(String(r.legajo || '-')) + '</span></td>' +
+        '<td class="p-3">' + ubicHtml + '</td>' +
+        '<td class="p-3 text-center">' + (mapaHtml || '<span class="text-slate-600 text-xs">\u2014</span>') + '</td>' +
+      '</tr>';
+  });
+  cuerpo.innerHTML = html;
 }
 
 // ====== CONFIGURACIÓN GLOBAL (tolerancias + radio) Y CÁLCULO DE CUMPLIMIENTO ======
@@ -568,6 +879,12 @@ function aplicarConfigGlobalAInputs() {
   if (oh) oh.checked = (configGlobalAdmin.offlineHabilitado === true);
   const vl = document.getElementById('cfgVentanaLoteOffline');
   if (vl) vl.value = configGlobalAdmin.ventanaLoteOfflineHoras;
+  // Clave nueva (#7): ventana anti-repeticion de fichadas (seg). 0 = desactivado.
+  const ar = document.getElementById('cfgAntiReplaySegundos');
+  if (ar) ar.value = configGlobalAdmin.antiReplaySegundos;
+  // Clave nueva (#5): tolerancia de reloj del dispositivo al sincronizar (seg).
+  const sk = document.getElementById('cfgSkewRelojOffline');
+  if (sk) sk.value = configGlobalAdmin.skewRelojOfflineSegundos;
 }
 
 async function cargarConfiguracionGlobal() {
@@ -583,6 +900,10 @@ async function cargarConfiguracionGlobal() {
       configGlobalAdmin.biometriaEstricta = (data.biometriaEstricta === true);
       configGlobalAdmin.offlineHabilitado = (data.offlineHabilitado === true);
       if (Number.isFinite(Number(data.ventanaLoteOfflineHoras)) && Number(data.ventanaLoteOfflineHoras) > 0) configGlobalAdmin.ventanaLoteOfflineHoras = Number(data.ventanaLoteOfflineHoras);
+      // Clave nueva (#7): ventana anti-repeticion (seg). Se acepta 0 (desactivado).
+      if (Number.isFinite(Number(data.antiReplaySegundos)) && Number(data.antiReplaySegundos) >= 0) configGlobalAdmin.antiReplaySegundos = Number(data.antiReplaySegundos);
+      // Clave nueva (#5): tolerancia de reloj del dispositivo (seg). Se acepta 0.
+      if (Number.isFinite(Number(data.skewRelojOfflineSegundos)) && Number(data.skewRelojOfflineSegundos) >= 0) configGlobalAdmin.skewRelojOfflineSegundos = Number(data.skewRelojOfflineSegundos);
     }
   } catch (err) {
     console.warn('No se pudo cargar la configuración global, se usan valores por defecto.', err);
@@ -599,11 +920,16 @@ async function guardarConfiguracionGlobal() {
   const precisionMaxima = Math.max(0, Math.min(2000, parseInt(precEl ? precEl.value : 0, 10) || 0));
   const beEl = document.getElementById('cfgBiometriaEstricta');
   const biometriaEstricta = !!(beEl && beEl.checked);
-  const payload = { toleranciaIngresoMin: tolIng, toleranciaEgresoMin: tolEgr, radioFichajeMetros: radio, precisionMaximaMetros: precisionMaxima, modoDispositivo: (configGlobalAdmin.modoDispositivo === 'individual' ? 'individual' : 'compartido'), biometriaEstricta: biometriaEstricta, actualizado: new Date().toISOString() };
+  // Clave nueva (#7): ventana anti-repeticion de fichadas (seg). 0 = desactivado.
+  const arEl = document.getElementById('cfgAntiReplaySegundos');
+  const antiReplaySegundos = Math.max(0, Math.min(3600, parseInt(arEl ? arEl.value : 90, 10) || 0));
+  const payload = { toleranciaIngresoMin: tolIng, toleranciaEgresoMin: tolEgr, radioFichajeMetros: radio, precisionMaximaMetros: precisionMaxima, modoDispositivo: (configGlobalAdmin.modoDispositivo === 'individual' ? 'individual' : 'compartido'), biometriaEstricta: biometriaEstricta, antiReplaySegundos: antiReplaySegundos, actualizado: new Date().toISOString() };
   if (estado) { estado.className = 'text-xs text-slate-400'; estado.innerText = 'Guardando...'; }
   try {
+    // PATCH (merge) en lugar de PUT para NO pisar el resto de /configuracionGlobal
+    // (flags offline, skew, etc. que se guardan desde otros botones).
     const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/configuracionGlobal.json`), {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('Respuesta no OK');
     configGlobalAdmin.toleranciaIngresoMin = tolIng;
@@ -611,6 +937,7 @@ async function guardarConfiguracionGlobal() {
     configGlobalAdmin.radioFichajeMetros = radio;
     configGlobalAdmin.precisionMaximaMetros = precisionMaxima;
     configGlobalAdmin.biometriaEstricta = biometriaEstricta;
+    configGlobalAdmin.antiReplaySegundos = antiReplaySegundos;
     if (estado) { estado.className = 'text-xs text-emerald-400 font-semibold'; estado.innerText = '✓ Configuración guardada.'; }
     filtrarTablaMarcaciones();
   } catch (err) {
@@ -653,15 +980,19 @@ async function guardarConfigOffline() {
   const estado = document.getElementById('cfgEstadoOffline');
   const habilitado = !!document.getElementById('cfgOfflineHabilitado').checked;
   const ventana = Math.max(1, Math.min(720, parseInt(document.getElementById('cfgVentanaLoteOffline').value, 10) || 168));
+  // Clave nueva (#5): tolerancia de reloj del dispositivo al sincronizar (seg).
+  const skEl = document.getElementById('cfgSkewRelojOffline');
+  const skewRelojOfflineSegundos = Math.max(0, Math.min(3600, parseInt(skEl ? skEl.value : 300, 10) || 0));
   if (estado) { estado.className = 'text-xs text-slate-400'; estado.innerText = 'Guardando...'; }
   try {
     const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/configuracionGlobal.json`), {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offlineHabilitado: habilitado, ventanaLoteOfflineHoras: ventana, offlineActualizado: new Date().toISOString() })
+      body: JSON.stringify({ offlineHabilitado: habilitado, ventanaLoteOfflineHoras: ventana, skewRelojOfflineSegundos: skewRelojOfflineSegundos, offlineActualizado: new Date().toISOString() })
     });
     if (!res.ok) throw new Error('Respuesta no OK');
     configGlobalAdmin.offlineHabilitado = habilitado;
     configGlobalAdmin.ventanaLoteOfflineHoras = ventana;
+    configGlobalAdmin.skewRelojOfflineSegundos = skewRelojOfflineSegundos;
     if (estado) {
       estado.className = 'text-xs text-emerald-400 font-semibold';
       estado.innerText = habilitado ? '✓ Fichaje offline HABILITADO.' : '✓ Fichaje offline deshabilitado.';
@@ -745,7 +1076,12 @@ document.addEventListener('click', function (ev) {
     case 'eliminarAsignacionTurno': eliminarAsignacionTurno(a1); break;
     case 'seleccionarResultadoNominatim': seleccionarResultadoNominatim(a1, parseInt(a2, 10)); break;
     case 'abrirModalEditarObjetivo': abrirModalEditarObjetivo(a1); break;
+    case 'reintentarCargarRonda': cargarRondaObjetivo(a1); break;
     case 'eliminarObjetivo': eliminarObjetivo(a1); break;
+    case 'toggleDiaRonda': toggleDiaRonda(a1); break;
+    case 'editarPuntoRonda': editarPuntoRonda(a1); break;
+    case 'eliminarPuntoRonda': eliminarPuntoRonda(a1); break;
+    case 'mostrarQRPunto': mostrarQRPunto(a1); break;
   }
 });
 
@@ -983,6 +1319,19 @@ async function recargarDatosEfectivo() {
         }
       });
     }
+    // 1a. Cargar el mapa de roles /usuarios (uid -> rol) para separar la lista.
+    //     Lectura permitida al admin por Reglas (/usuarios .read = admin).
+    mapaRolesUsuarios = {};
+    try {
+      const resUsuarios = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/usuarios.json`));
+      const dataUsuarios = await resUsuarios.json();
+      if (dataUsuarios) {
+        Object.keys(dataUsuarios).forEach(uid => {
+          const u = dataUsuarios[uid] || {};
+          mapaRolesUsuarios[uid] = (u.rol || 'empleado');
+        });
+      }
+    } catch (_) { /* si falla, todos se muestran como personal (comportamiento previo) */ }
     renderizarTablaPersonal(datosPersonal);
 
     // 1b. Cargar TODOS los cambios de turno (para derivar el horario programado
@@ -1013,7 +1362,7 @@ async function recargarDatosEfectivo() {
           // manipulable) primero; 'timestamp' queda como compat de fichadas antiguas y el
           // reloj del dispositivo SOLO como fallback final para registros sin sello.
           // Evita que un telefono con la hora cambiada falsee llegada tarde / salida anticipada.
-          const fecha = d.timestampServidor || d.timestamp || d.fechaHoraDispositivo || '';
+          const fecha = d.timestampServidor || d.timestampEstimadoDispositivo || d.timestamp || d.fechaHoraDispositivo || '';
           const mapaUrl = (d.latitud && d.longitud) ? `https://maps.google.com/?q=${d.latitud},${d.longitud}` : '';
           
           const legajoStr = d.legajo ? String(d.legajo).trim() : '';
@@ -1069,7 +1418,7 @@ async function recargarDatosEfectivo() {
       Object.keys(dataNovedades).forEach(id => {
         const d = dataNovedades[id];
         if (d) {
-          const fecha = d.timestampServidor || d.fechaHoraDispositivo || d.timestamp || d.fechaHora || '';
+          const fecha = d.timestampServidor || d.timestampEstimadoDispositivo || d.fechaHoraDispositivo || d.timestamp || d.fechaHora || '';
           const mapaUrl = (d.latitud && d.longitud) ? `https://maps.google.com/?q=${d.latitud},${d.longitud}` : '';
           const fotoNovedad = d.fotoBase64 || d.foto || '';
           datosNovedades.push([fecha, d.legajo ? String(d.legajo) : '', d.nombre || '', d.objetivo || '', d.tipoIncidencia || 'General', d.descripcion || '', mapaUrl, fotoNovedad]);
@@ -1090,7 +1439,7 @@ async function recargarDatosEfectivo() {
           if (d.anulado === true) return;
           // Priorizamos el sello de servidor (timestampServidor, .sv) por ser hora oficial
           // NO manipulable; luego fechaHora/timestamp enviados desde mis-horas como fallback.
-          const rawFecha = d.timestampServidor || d.fechaHora || d.timestamp || d.fecha || '';
+          const rawFecha = d.timestampServidor || d.timestampEstimadoDispositivo || d.fechaHora || d.timestamp || d.fecha || '';
           const mapaUrl = (d.latitud && d.longitud) ? `https://maps.google.com/?q=${d.latitud},${d.longitud}` : '';
           
           datosPanicos.push([
@@ -1399,27 +1748,21 @@ async function aprobarFraudeManual() {
   if (!id) return;
 
   try {
-    const resAprob = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/fichadas/${id}.json`), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      // 'verificacionOfflineResuelta' es la marca que saca la fichada del estado
-      // "Pendiente de verificacion": el origen offline NO se borra (queda como
-      // evidencia del hecho), pero la deteccion la respeta y deja de listarla.
-      body: JSON.stringify({ alertaFraude: false, requiereRevisionManual: false, verificacionOfflineResuelta: true, validacionFacial: 'VALIDADA_MANUAL', motivoFraude: "Validada manualmente por el administrador", motivoRevision: "Validada manualmente por el administrador" })
-    });
-    if (!resAprob.ok) { const t = await resAprob.text().catch(() => ''); throw new Error('HTTP ' + resAprob.status + ' ' + t); }
+    // MIGRADO A SERVER-SIDE (hallazgo #4): la validacion de la fichada la realiza
+    // el Worker con la service account y escribe la auditoria FICHADA_APROBADA de
+    // forma atomica (fail-closed). El cliente ya NO hace el PATCH por REST.
+    await window.llamarWorkerAdmin({ accion: 'validarFichada', fichadaId: id, motivo: 'Validada manualmente por el administrador' });
 
     // VERIFICACION EN LA BASE: releemos ESTA fichada (sin cache) y confirmamos
     // que la marca de resolucion quedo realmente escrita antes de dar el OK.
     // Asi el cartel de exito refleja el estado REAL de la base, no la respuesta
-    // del PATCH a ciegas.
+    // del Worker a ciegas.
     const resCheck = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/fichadas/${id}.json?ts=${Date.now()}`), { cache: 'no-store' });
     const fichadaBase = resCheck.ok ? await resCheck.json().catch(() => null) : null;
     if (!fichadaBase || fichadaBase.verificacionOfflineResuelta !== true) {
       throw new Error('la base no confirmo el cambio (el estado no persistio). Reintenta.');
     }
 
-    registrarAuditoria('FICHADA_APROBADA', `fichadas/${id}`, { motivo: 'Validada manualmente por el administrador' });
     alert("Fichada validada correctamente (confirmado en la base de datos).");
     cerrarModalAccionFraude();
     recargarDatosEfectivo();
@@ -1665,12 +2008,30 @@ function filtrarTablaNovedades() {
 
 function renderizarTablaPersonal(registros) {
   const cuerpo = document.getElementById('cuerpoTablaPersonal');
+  const cuerpoRoles = document.getElementById('cuerpoTablaRoles');
   cuerpo.innerHTML = "";
+  if (cuerpoRoles) cuerpoRoles.innerHTML = "";
   if (!registros || registros.length === 0) {
     cuerpo.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">No hay personal registrado.</td></tr>`;
+    if (cuerpoRoles) cuerpoRoles.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">No hay supervisores ni administradores.</td></tr>`;
     return;
   }
+  let nVig = 0, nRoles = 0;
   registros.forEach(fila => {
+    const firebaseId = fila[5];
+    const rol = mapaRolesUsuarios[firebaseId] || 'empleado';
+    const esRol = (rol === 'supervisor' || rol === 'admin');
+    const tr = construirFilaPersonal(fila, rol);
+    if (esRol && cuerpoRoles) { cuerpoRoles.appendChild(tr); nRoles++; }
+    else { cuerpo.appendChild(tr); nVig++; }
+  });
+  if (nVig === 0) cuerpo.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">No hay vigiladores registrados.</td></tr>`;
+  if (cuerpoRoles && nRoles === 0) cuerpoRoles.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">No hay supervisores ni administradores.</td></tr>`;
+}
+
+// Construye una fila de la tabla de personal. Si el usuario es supervisor/admin
+// se le agrega una etiqueta de rol junto al nombre (misma estructura de columnas).
+function construirFilaPersonal(fila, rol) {
     const legajoStr = String(fila[0]);
     const nombreStr = fila[1] || '';
     const pinStr = fila[3] || '****';
@@ -1682,6 +2043,14 @@ function renderizarTablaPersonal(registros) {
     const objetivos = Array.isArray(cfg.objetivosAsignados) ? cfg.objetivosAsignados : [];
     const horarioTexto = h.inicio && h.fin ? `${h.inicio} - ${h.fin}` : 'Sin horario habitual';
     const objetivosTexto = objetivos.length ? `${objetivos.length} autorizado(s)` : 'Sin objetivos asignados';
+    const esRol = (rol === 'supervisor' || rol === 'admin');
+    const badgeRol = esRol
+      ? `<span class="ml-2 align-middle text-[10px] font-bold uppercase px-2 py-0.5 rounded ${rol === 'admin' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/40' : 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/40'}">${rol === 'admin' ? 'Administrador' : 'Supervisor'}</span>`
+      : '';
+    // Linea secundaria: para vigiladores el horario/objetivos; para roles, como ingresan al panel.
+    const subLinea = esRol
+      ? `Ingreso al panel: legajo ${escaparHtml(legajoStr)} + PIN`
+      : `${escaparHtml(horarioTexto)} · ${escaparHtml(objetivosTexto)}`;
     const btnFotoMaster = (fotoMaster && fotoMaster.length > 50)
       ? `<button data-accion="abrirFoto" data-a1="${escaparHtml(fotoMaster)}" class="inline-flex items-center gap-1 bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-500/30 px-3 py-1 rounded-lg text-xs font-semibold transition"><i class="fa-solid fa-id-card"></i> Ver Foto</button>`
       : `<span class="text-xs text-slate-500">Sin Foto</span>`;
@@ -1690,22 +2059,23 @@ function renderizarTablaPersonal(registros) {
     const btnEstadoVig = esActivoVig
       ? `<button data-accion="cambiarEstadoPersonal" data-a1="${escaparHtml(firebaseId)}" data-a2="true" class="bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 border border-orange-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-user-slash"></i> Dar de baja</button>`
       : `<button data-accion="cambiarEstadoPersonal" data-a1="${escaparHtml(firebaseId)}" data-a2="false" class="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-user-check"></i> Reactivar</button>`;
+    // El boton "Turnos" solo tiene sentido para vigiladores (fichan en un puesto).
+    const btnTurnos = esRol ? '' : `<button data-accion="abrirModalTurnosPersonal" data-a1="${escaparHtml(firebaseId)}" class="bg-sky-600/20 text-sky-400 hover:bg-sky-600/40 border border-sky-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-calendar-days"></i> Turnos</button>`;
     const tr = document.createElement('tr');
     tr.className = "hover:bg-slate-700/30 transition";
     tr.innerHTML = `
       <td class="p-4 font-bold text-amber-400">${escaparHtml(legajoStr)}</td>
-      <td class="p-4 font-medium text-white">${escaparHtml(nombreStr)}<div class="text-[11px] text-slate-500 mt-1">${escaparHtml(horarioTexto)} · ${escaparHtml(objetivosTexto)}</div></td>
+      <td class="p-4 font-medium text-white">${escaparHtml(nombreStr)}${badgeRol}<div class="text-[11px] text-slate-500 mt-1">${subLinea}</div></td>
       <td class="p-4 text-center font-mono text-slate-400">${escaparHtml(pinStr)}</td>
       <td class="p-4 text-center">${btnFotoMaster}</td>
       <td class="p-4 text-center"><span class="${claseEstadoVig} px-2 py-1 rounded text-xs">${escaparHtml(estadoStr)}</span></td>
       <td class="p-4 text-center"><div class="flex flex-wrap justify-center gap-2">
         <button data-accion="abrirModalEditar" data-a1="${escaparHtml(firebaseId)}" class="bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-sliders"></i> Configurar</button>
-        <button data-accion="abrirModalTurnosPersonal" data-a1="${escaparHtml(firebaseId)}" class="bg-sky-600/20 text-sky-400 hover:bg-sky-600/40 border border-sky-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-calendar-days"></i> Turnos</button>
+        ${btnTurnos}
         ${btnEstadoVig}
         <button data-accion="eliminarPersonal" data-a1="${escaparHtml(firebaseId)}" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600/40 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-trash"></i> Eliminar</button>
       </div></td>`;
-    cuerpo.appendChild(tr);
-  });
+    return tr;
 }
 
 async function abrirModalEditar(id) {
@@ -1724,6 +2094,14 @@ async function abrirModalEditar(id) {
     ? `<span class="text-emerald-400"><i class="fa-solid fa-check"></i> Posee foto máster cargada</span>`
     : `<span class="text-rose-400"><i class="fa-solid fa-xmark"></i> Sin foto máster</span>`;
   await cargarCheckboxObjetivosPersonal(cfg.objetivosAsignados || []);
+  // Roles de control (supervisor/admin): NO se les asignan objetivos de fichada.
+  // Se oculta el selector de objetivos y se muestra un aviso explicativo.
+  const rolActual = mapaRolesUsuarios[id] || 'empleado';
+  const esRolControl = (rolActual === 'supervisor' || rolActual === 'admin');
+  const bloqueObj = document.getElementById('bloqueObjetivosEditar');
+  const avisoRol = document.getElementById('avisoRolSinObjetivos');
+  if (bloqueObj) bloqueObj.classList.toggle('hidden', esRolControl);
+  if (avisoRol) avisoRol.classList.toggle('hidden', !esRolControl);
   document.getElementById('modalEditarPersonal').classList.remove('hidden');
 }
 
@@ -1763,15 +2141,25 @@ async function guardarEdicionPersonal() {
   const btn = document.getElementById('btnGuardarEdicion');
   if (!id || !legajo || !nombre) return alert('Completá legajo y nombre.');
   if ((inicio && !fin) || (!inicio && fin)) return alert('Completá ambos horarios habituales o dejalos vacíos.');
+  // Si se escribió un PIN nuevo, exigimos que sea fuerte (sin secuencias ni
+  // repeticiones ni PINs comunes). Vacío = se conserva el PIN actual.
+  if (pin && window.validarFortalezaPin) {
+    const _fp = window.validarFortalezaPin(pin);
+    if (!_fp.ok) return alert('No se cambió el PIN: ' + _fp.mensaje + '\n\nDejá el campo PIN vacío para conservar el actual, o escribí uno más seguro.');
+  }
   btn.disabled = true; btn.innerText = 'Guardando...';
   const objetivosAsignados = Array.from(document.querySelectorAll('.objetivo-personal-checkbox:checked')).map(cb => ({ id: cb.value, nombre: cb.dataset.nombre || '' }));
+  // Blindaje: a los roles de control (supervisor/admin) nunca se les guardan
+  // objetivos, aunque por algun motivo llegara a existir una seleccion previa.
+  const rolGuardar = mapaRolesUsuarios[id] || 'empleado';
+  const objetivosFinal = (rolGuardar === 'supervisor' || rolGuardar === 'admin') ? [] : objetivosAsignados;
   // El PIN nunca se guarda en texto plano: si se ingresó uno nuevo se deriva hash+salt;
   // si el campo queda vacío, se conserva el PIN actual.
   const fichaActual = mapaConfiguracionPersonal[id] || {};
   // Las Reglas FINALES exigen en /personal/<id>: legajo (STRING), nombre y estado.
   // Un PATCH que no reenvíe 'estado' (o con legajo numérico) es DENEGADO por .validate.
   // Por eso reenviamos estado (conservando el actual) y forzamos legajo como texto.
-  const datosActualizados = { legajo: String(legajo).trim(), nombre, estado: (fichaActual.estado || 'activo'), horarioHabitual: { inicio: inicio || '', fin: fin || '' }, objetivosAsignados };
+  const datosActualizados = { legajo: String(legajo).trim(), nombre, estado: (fichaActual.estado || 'activo'), horarioHabitual: { inicio: inicio || '', fin: fin || '' }, objetivosAsignados: objetivosFinal };
   // Las credenciales (pinHash/pinSalt) NO se guardan en /personal (nodo legible por
   // supervisores): se escriben en /credenciales/<id> (acceso solo admin/dueño por Reglas).
   let credencialNueva = null;
@@ -1806,68 +2194,29 @@ async function guardarEdicionPersonal() {
       // Exito atomico: el Worker ya audito. Refrescamos cache local y cerramos
       // SIN ejecutar las escrituras sueltas de abajo (ruta no atomica).
       mapaConfiguracionPersonal[id] = { ...(mapaConfiguracionPersonal[id] || {}), ...datosActualizados };
-      alert('Personal actualizado con éxito.');
       cerrarModalEditar();
       recargarDatosEfectivo();
       btn.disabled = false; btn.innerText = 'Guardar Cambios';
+      // Si se cambio el PIN, mostramos el comprobante (unica vez que se ve en claro).
+      if (pin && typeof window.mostrarComprobantePin === 'function') {
+        window.mostrarComprobantePin({ legajo: String(legajo).trim(), nombre, pin: String(pin).trim(), rol: rolGuardar, modo: 'cambio' });
+      } else {
+        alert('Personal actualizado con éxito.');
+      }
       return;
     } catch (eAtom) {
+      // [#4] El panel ya NO escribe /personal, /usuarios ni /credenciales de forma
+      //      directa (las Reglas los tienen en .write:false). Toda la edicion pasa
+      //      por el Worker; cualquier error se informa y se ABORTA, sin ruta legacy.
       const msgAtom = String((eAtom && eAtom.message) || eAtom);
-      if (!/desconocida/i.test(msgAtom)) {
-        // Error real de la operacion atomica (Auth, o inconsistencia parcial):
-        // se informa y NO se reintenta por la ruta legacy.
-        alert('No se pudo guardar de forma atómica: ' + msgAtom);
-        btn.disabled = false; btn.innerText = 'Guardar Cambios';
-        return;
-      }
-      console.warn('El Worker no conoce actualizarEmpleado; usando la ruta clásica.', msgAtom);
+      alert('No se pudo guardar los cambios: ' + msgAtom);
+      btn.disabled = false; btn.innerText = 'Guardar Cambios';
+      return;
     }
+  } else {
+    alert('No se puede guardar: el servicio de administración (Worker) no está configurado (URL_WORKER_AUTH vacío).');
+    btn.disabled = false; btn.innerText = 'Guardar Cambios';
   }
-  // ================== RUTA CLASICA (fallback) ==================
-  try {
-    const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/personal/${id}.json`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datosActualizados) });
-    if (!res.ok) throw new Error('Error al actualizar en Firebase');
-    let avisoAuth = '';
-    // ¿Cambió el legajo? El login del empleado es legajo@mercosurseg.com, así que
-    // si cambia el legajo también hay que cambiar el email de Auth, no solo /usuarios.
-    const legajoAnterior = String(fichaActual.legajo || '').trim();
-    const legajoNuevo = String(legajo).trim();
-    const legajoCambio = legajoAnterior !== '' && legajoAnterior !== legajoNuevo;
-    // Guarda la credencial hasheada nueva (si se cambió el PIN).
-    if (credencialNueva) {
-      await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/credenciales/${id}.json`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credencialNueva) });
-    }
-    // Sincroniza Firebase Auth vía el Worker cuando cambia el PIN (clave) y/o el legajo (email).
-    // Así el empleado puede loguear de verdad con su legajo/PIN nuevos, no solo con el hash local.
-    if (credencialNueva || legajoCambio) {
-      if (URL_WORKER_AUTH) {
-        try {
-          const tokenAdmin = await window.obtenerTokenAdmin();
-          const cuerpoWorker = { idToken: tokenAdmin, uid: id };
-          if (credencialNueva) cuerpoWorker.nuevaClave = String(pin).trim().padStart(6, '0');
-          if (legajoCambio) cuerpoWorker.nuevoEmail = legajoNuevo + '@mercosurseg.com';
-          const wr = await fetch(URL_WORKER_AUTH, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpoWorker) });
-          const wd = await wr.json().catch(() => ({}));
-          if (!wr.ok || !wd.ok) avisoAuth = '\n\n⚠️ Los datos se guardaron, pero NO se pudo sincronizar el acceso (Auth): ' + (wd.error || ('HTTP ' + wr.status)) + '. El empleado sigue ingresando con su legajo/PIN anteriores hasta reintentar.';
-        } catch (e) { avisoAuth = '\n\n⚠️ Los datos se guardaron, pero no se pudo contactar el servicio de acceso (Auth). El empleado sigue ingresando con su legajo/PIN anteriores.'; }
-      } else {
-        avisoAuth = '\n\n⚠️ Nota: el cambio de PIN/legajo aún no está conectado al servicio de Auth (falta configurar URL_WORKER_AUTH), así que el empleado sigue ingresando con sus credenciales anteriores.';
-      }
-    }
-    // Sincroniza la identidad de acceso (/usuarios/<uid>) en la MISMA edición:
-    // si cambia el legajo o el nombre, /usuarios queda al día sin depender de
-    // apretar "Sincronizar identidades" a mano. No pisa el rol (solo legajo/nombre).
-    // El id de /personal es el uid del empleado, así que /usuarios/<id> es su identidad.
-    try {
-      await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/usuarios/${id}.json`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ legajo: String(legajo).trim(), nombre }) });
-    } catch (e) { console.warn('No se pudo sincronizar /usuarios en la edición:', e); }
-    mapaConfiguracionPersonal[id] = { ...(mapaConfiguracionPersonal[id] || {}), ...datosActualizados };
-    registrarAuditoria('PERSONAL_EDITADO', `personal/${id}`, { legajo, nombre });
-    alert('Personal actualizado con éxito.' + avisoAuth);
-    cerrarModalEditar();
-    recargarDatosEfectivo();
-  } catch(err) { alert('Ocurrió un error al editar: ' + err.toString()); }
-  finally { btn.disabled = false; btn.innerText = 'Guardar Cambios'; }
 }
 
 // Activa / da de baja a un vigilador. Un legajo INACTIVO no puede fichar
@@ -1877,17 +2226,14 @@ async function cambiarEstadoPersonal(firebaseId, estabaActivo) {
   const accion = estabaActivo ? 'dar de baja' : 'reactivar';
   if (!confirm(`¿Seguro que querés ${accion} a este vigilador? Un legajo dado de baja no podrá fichar.`)) return;
   try {
-    const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/personal/${firebaseId}.json`), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: nuevoEstado })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    // [#4] El estado ya NO se escribe directo en /personal (Reglas .write:false).
+    //      Pasa por el Worker (actualizarEmpleado), que patchea /personal con la
+    //      service account y audita el cambio server-side.
+    await window.llamarWorkerAdmin({ accion: 'actualizarEmpleado', uid: firebaseId, personal: { estado: nuevoEstado } });
     if (mapaConfiguracionPersonal[firebaseId]) mapaConfiguracionPersonal[firebaseId].estado = nuevoEstado;
-    registrarAuditoria('PERSONAL_ESTADO', `personal/${firebaseId}`, { estado: nuevoEstado });
     alert(estabaActivo ? 'Vigilador dado de baja. Ya no podrá fichar.' : 'Vigilador reactivado.');
     recargarDatosEfectivo();
-  } catch(err) { alert('No se pudo actualizar el estado: ' + err.toString()); }
+  } catch(err) { alert('No se pudo actualizar el estado: ' + ((err && err.message) || err)); }
 }
 
 async function eliminarPersonal(firebaseId) {
@@ -1906,47 +2252,16 @@ async function eliminarPersonal(firebaseId) {
       recargarDatosEfectivo();
       return;
     } catch (eAtomDel) {
+      // [#4] El panel ya NO borra /personal, /usuarios ni /credenciales de forma
+      //      directa (Reglas .write:false). Toda la baja pasa por el Worker;
+      //      cualquier error se informa y se ABORTA, sin ruta legacy.
       const msgAtomDel = String((eAtomDel && eAtomDel.message) || eAtomDel);
-      if (!/desconocida/i.test(msgAtomDel)) {
-        alert('No se pudo eliminar de forma atómica: ' + msgAtomDel);
-        return;
-      }
-      console.warn('El Worker no conoce darDeBajaEmpleado; usando la ruta clásica.', msgAtomDel);
+      alert('No se pudo eliminar el registro: ' + msgAtomDel);
+      return;
     }
+  } else {
+    alert('No se puede eliminar: el servicio de administración (Worker) no está configurado (URL_WORKER_AUTH vacío).');
   }
-  // ================== RUTA CLASICA (fallback) ==================
-  try {
-    // 1. Borrar la ficha de /personal (verificando que el servidor lo acepte).
-    const resP = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/personal/${firebaseId}.json`), { method: 'DELETE' });
-    if (!resP.ok) {
-      let detalle = '';
-      try { detalle = (await resP.json())?.error || ''; } catch (_) {}
-      throw new Error(detalle || `el servidor rechazó el borrado (HTTP ${resP.status}).`);
-    }
-    // 2. Limpieza real de las ramas asociadas (identidad y credenciales).
-    //    No bloquean la operación si ya no existen; se registran los fallos.
-    try { await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/usuarios/${firebaseId}.json`), { method: 'DELETE' }); } catch (_) {}
-    try { await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/credenciales/${firebaseId}.json`), { method: 'DELETE' }); } catch (_) {}
-    // 3. Eliminar la cuenta de Firebase Auth para que no quede una cuenta
-    //    huerfana capaz de seguir autenticandose. El borrado en Auth solo se
-    //    puede hacer del lado del servidor (Admin SDK): se delega al Worker.
-    //    Es tolerante a fallo: no bloquea la baja de datos, pero avisa al admin.
-    let avisoAuthElim = '';
-    if (URL_WORKER_AUTH) {
-      try {
-        const tokenAdminElim = await window.obtenerTokenAdmin();
-        const wrElim = await fetch(URL_WORKER_AUTH, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: tokenAdminElim, uid: firebaseId, accion: 'eliminar' }) });
-        const wdElim = await wrElim.json().catch(() => ({}));
-        if (!wrElim.ok || !wdElim.ok) avisoAuthElim = '\n\n⚠️ La ficha se elimino, pero NO se pudo dar de baja la cuenta de acceso (Auth): ' + (wdElim.error || ('HTTP ' + wrElim.status)) + '. El Worker debe soportar accion:"eliminar".';
-      } catch (e) { avisoAuthElim = '\n\n⚠️ La ficha se elimino, pero no se pudo contactar el servicio de acceso (Auth) para borrar la cuenta.'; }
-    } else {
-      avisoAuthElim = '\n\n⚠️ La ficha se elimino, pero la cuenta de acceso (Auth) sigue activa (falta configurar URL_WORKER_AUTH).';
-    }
-    registrarAuditoria('PERSONAL_ELIMINADO', `personal/${firebaseId}`, { legajo: legajoElim });
-    delete mapaConfiguracionPersonal[firebaseId];
-    alert('Registro eliminado con éxito (ficha, identidad y credenciales).' + avisoAuthElim);
-    recargarDatosEfectivo();
-  } catch(err) { alert('No se pudo eliminar el registro: ' + (err.message || err) + '\n\nSi el problema persiste, verificá que estés logueado como administrador.'); }
 }
 
 async function abrirModalTurnosPersonal(id) {
@@ -2099,9 +2414,11 @@ async function obtenerMapaObjetivo(modo) {
   return mapa;
 }
 
-function colocarMarcadorObjetivo(modo, lat, lon, zoom = 18, draggable = true) {
+async function colocarMarcadorObjetivo(modo, lat, lon, zoom = 18, draggable = true) {
   if (!validarCoordenadas(lat, lon)) return;
-  const mapa = obtenerMapaObjetivo(modo);
+  // Esperar a que Leaflet (lazy) termine de cargar ANTES de usar 'L'.
+  // Antes esto era sincronico y usaba 'L' sin cargar -> 'L is not defined'.
+  const mapa = await obtenerMapaObjetivo(modo);
   if (!mapa) return;
 
   const esNuevo = modo === 'nuevo';
@@ -2130,7 +2447,7 @@ function establecerCoordenadasObjetivo(modo, lat, lon, mensaje = '') {
   const lonId = modo === 'nuevo' ? 'newLongitudObjetivo' : 'editLongitudObjetivo';
   document.getElementById(latId).value = formatearCoordenada(lat);
   document.getElementById(lonId).value = formatearCoordenada(lon);
-  colocarMarcadorObjetivo(modo, lat, lon);
+  Promise.resolve(colocarMarcadorObjetivo(modo, lat, lon)).catch(function (e) { console.warn('No se pudo colocar el marcador:', e); });
   if (mensaje) mostrarInfoUbicacion(modo, `${escaparHtml(mensaje)}<br><span class="font-mono">Lat: ${formatearCoordenada(lat)} &nbsp; Lon: ${formatearCoordenada(lon)}</span>`, 'success');
   return true;
 }
@@ -2202,8 +2519,9 @@ function seleccionarResultadoNominatim(modo, indice) {
   document.getElementById(direccionId).value = resultado.display_name || document.getElementById(direccionId).value;
   const contenedorId = modo === 'nuevo' ? 'resultadoDireccionNuevo' : 'resultadoDireccionEditar';
   document.getElementById(contenedorId).innerHTML = `<div class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 rounded-xl p-3 text-xs"><i class="fa-solid fa-circle-check"></i> Ubicación seleccionada: <strong>${escaparHtml(resultado.display_name || '')}</strong><br><span class="text-[11px]">El marcador quedó en ${formatearCoordenada(lat)}, ${formatearCoordenada(lon)}. Podés arrastrarlo para corregir el punto.</span></div>`;
-  const mapa = obtenerMapaObjetivo(modo);
-  if (mapa) setTimeout(() => mapa.invalidateSize(), 100);
+  obtenerMapaObjetivo(modo).then(function (mapa) {
+    if (mapa) setTimeout(() => mapa.invalidateSize(), 100);
+  }).catch(function (e) { console.warn('No se pudo preparar el mapa del objetivo:', e); });
 }
 
 function aplicarCoordenadasManualesObjetivo(modo) {
@@ -2390,9 +2708,23 @@ function abrirModalEditarObjetivo(firebaseId) {
   document.getElementById('modalEditarObjetivo').classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
   if (mapaObjetivoEditar) { mapaObjetivoEditar.remove(); mapaObjetivoEditar = null; marcadorObjetivoEditar = null; }
-  const mapa = obtenerMapaObjetivo('editar');
-  if (validarCoordenadas(fila[3], fila[4])) colocarMarcadorObjetivo('editar', fila[3], fila[4]);
-  else if (mapa) setTimeout(() => mapa.invalidateSize(), 150);
+  // Cargar config + puntos de la ronda PRIMERO. Antes el mapa (Leaflet lazy)
+  // se iniciaba de forma sincronica y lanzaba "L is not defined" al abrir el
+  // objetivo, abortando esta funcion ANTES de llegar a cargar los puntos: por
+  // eso la lista salia vacia hasta que se agregaba un punto nuevo. Ahora la
+  // carga de puntos NO depende del mapa.
+  cargarRondaObjetivo(firebaseId);
+  // Mapa aislado: cualquier fallo del mapa queda contenido y nunca impide que
+  // aparezca la lista de puntos.
+  (async function () {
+    try {
+      const mapa = await obtenerMapaObjetivo('editar');
+      if (validarCoordenadas(fila[3], fila[4])) await colocarMarcadorObjetivo('editar', fila[3], fila[4]);
+      else if (mapa) setTimeout(() => mapa.invalidateSize(), 150);
+    } catch (e) {
+      console.warn('No se pudo inicializar el mapa del objetivo (no afecta a los puntos):', e);
+    }
+  })();
 }
 
 function cerrarModalEditarObjetivo() {
@@ -2696,6 +3028,362 @@ async function exportarPDFNovedades() {
 // All former inline event handlers (onclick/onsubmit/onkeyup/onchange)
 // moved here as addEventListener calls to allow removing 'unsafe-inline' from CSP.
 
+// SISTEMA DE RONDAS CON QR - Paso 1 (panel admin). Aditivo. Carga/edita el
+// horario de la ronda y los puntos de control de cada objetivo y genera/imprime/
+// descarga el QR de cada punto. Todo via REST con ?auth de admin
+// (window.urlConAuthAdmin). No toca el Worker ni la logica previa.
+var DIAS_RONDA = [
+  { n: 1, t: 'Lun' }, { n: 2, t: 'Mar' }, { n: 3, t: 'Mie' },
+  { n: 4, t: 'Jue' }, { n: 5, t: 'Vie' }, { n: 6, t: 'Sab' }, { n: 0, t: 'Dom' }
+];
+var _puntosRondaActual = {};
+var _diasRondaSel = [];
+var _qrPuntoActual = null;
+
+// Token aleatorio e irrepetible por punto (lo valida el vigilador al escanear).
+function generarTokenPunto() {
+  var buf = new Uint8Array(16);
+  (window.crypto || window.msCrypto).getRandomValues(buf);
+  var hex = '';
+  for (var i = 0; i < buf.length; i++) hex += ('0' + buf[i].toString(16)).slice(-2);
+  return hex;
+}
+
+// Carga qrcodejs bajo demanda (CDN con SRI), igual que el resto de librerias.
+var _lazyQRPromise = null;
+function lazyQR() {
+  if (_lazyQRPromise) return _lazyQRPromise;
+  _lazyQRPromise = window.cargarCDN(
+    'qrcodejs',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA=='
+  );
+  return _lazyQRPromise;
+}
+
+function infoPuntoRonda(mensaje, tipo) {
+  var el = document.getElementById('infoPuntoRonda');
+  if (!el) return;
+  if (!mensaje) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  var color = tipo === 'error' ? 'text-rose-400' : (tipo === 'ok' ? 'text-emerald-400' : 'text-slate-400');
+  el.className = 'text-xs ' + color;
+  el.innerHTML = mensaje;
+}
+
+function renderDiasRonda() {
+  var cont = document.getElementById('rondaDias');
+  if (!cont) return;
+  cont.innerHTML = '';
+  DIAS_RONDA.forEach(function (d) {
+    var on = _diasRondaSel.indexOf(d.n) >= 0;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-accion', 'toggleDiaRonda');
+    b.setAttribute('data-a1', String(d.n));
+    b.className = on
+      ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition'
+      : 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition';
+    b.textContent = d.t;
+    cont.appendChild(b);
+  });
+}
+
+function toggleDiaRonda(n) {
+  n = parseInt(n, 10);
+  var i = _diasRondaSel.indexOf(n);
+  if (i >= 0) _diasRondaSel.splice(i, 1); else _diasRondaSel.push(n);
+  renderDiasRonda();
+}
+
+function cancelarEdicionPunto() {
+  var set = function (elid, val) { var e = document.getElementById(elid); if (e) e.value = val; };
+  set('puntoEditandoId', ''); set('puntoNombre', ''); set('puntoLat', ''); set('puntoLng', ''); set('puntoRadio', ''); set('puntoPrecision', '');
+  var f = document.getElementById('puntoFoto'); if (f) f.checked = false;
+  var t = document.getElementById('btnAgregarPuntoTexto'); if (t) t.textContent = 'Agregar punto';
+  var tit = document.getElementById('tituloFormPunto'); if (tit) tit.textContent = 'Agregar punto de control';
+  var cancel = document.getElementById('btnCancelarEdicionPunto'); if (cancel) cancel.classList.add('hidden');
+  infoPuntoRonda('', '');
+}
+
+// Carga config + puntos del objetivo abierto en el modal de edicion.
+async function cargarRondaObjetivo(id) {
+  _puntosRondaActual = {};
+  _diasRondaSel = [];
+  var set = function (elid, val) { var e = document.getElementById(elid); if (e) e.value = val; };
+  set('rondaHoraInicio', ''); set('rondaHoraFin', ''); set('rondaFrecuencia', ''); set('rondaTolerancia', '');
+  var chk = document.getElementById('rondaActiva'); if (chk) chk.checked = false;
+  cancelarEdicionPunto();
+  renderDiasRonda();
+  renderPuntosRonda({});
+  if (!id) return;
+  // Lectura con auth fresca cada intento (token recalculado en urlConAuthAdmin).
+  var leerRondas = async function () {
+    var url = await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos/${id}/rondas.json?ts=${Date.now()}`);
+    return fetch(url, { cache: 'no-store' });
+  };
+  try {
+    var res = await leerRondas();
+    // Reintento unico: si la 1a lectura falla (401 transitorio tras renovar el
+    // token, o un corte de red), esperamos un instante y reintentamos ANTES de
+    // decidir que no hay puntos. Asi evitamos la lista vacia enganosa.
+    if (!res.ok) {
+      await new Promise(function (r) { setTimeout(r, 450); });
+      res = await leerRondas();
+    }
+    if (!res.ok) { renderErrorPuntosRonda(id); return; }
+    var data = await res.json();
+    if (data) {
+      var cfg = data.config || {};
+      set('rondaHoraInicio', cfg.horaInicio || '');
+      set('rondaHoraFin', cfg.horaFin || '');
+      set('rondaFrecuencia', (cfg.frecuenciaMin != null) ? cfg.frecuenciaMin : '');
+      set('rondaTolerancia', (cfg.toleranciaMin != null) ? cfg.toleranciaMin : '');
+      if (chk) chk.checked = cfg.activo === true;
+      _diasRondaSel = Array.isArray(cfg.diasSemana) ? cfg.diasSemana.slice() : [];
+      renderDiasRonda();
+      _puntosRondaActual = data.puntos || {};
+    }
+    renderPuntosRonda(_puntosRondaActual);
+  } catch (err) {
+    console.warn('No se pudo cargar la ronda del objetivo:', err);
+    renderErrorPuntosRonda(id);
+  }
+}
+
+// Aviso visible (no silencioso) cuando la lectura de puntos falla, con boton
+// para reintentar sin tener que cerrar y reabrir el objetivo.
+function renderErrorPuntosRonda(id) {
+  var cuerpo = document.getElementById('cuerpoPuntosRonda');
+  if (!cuerpo) return;
+  cuerpo.innerHTML = '<tr><td colspan="4" class="p-6 text-center">' +
+    '<span class="text-rose-400 mr-1">No se pudieron cargar los puntos.</span>' +
+    '<button data-accion="reintentarCargarRonda" data-a1="' + escaparHtml(String(id || '')) + '" class="bg-sky-600/20 text-sky-400 hover:bg-sky-600/40 border border-sky-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1"><i class="fa-solid fa-rotate-right"></i> Reintentar</button>' +
+    '</td></tr>';
+}
+
+async function guardarConfigRonda() {
+  var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
+  if (!id) return alert('Primero guarda el objetivo.');
+  var btn = document.getElementById('btnGuardarConfigRonda');
+  var horaInicio = (document.getElementById('rondaHoraInicio').value || '').trim();
+  var horaFin = (document.getElementById('rondaHoraFin').value || '').trim();
+  var frecuencia = parseInt(document.getElementById('rondaFrecuencia').value, 10);
+  var tolerancia = parseInt(document.getElementById('rondaTolerancia').value, 10);
+  var activo = !!document.getElementById('rondaActiva').checked;
+  var payload = {
+    activo: activo, horaInicio: horaInicio, horaFin: horaFin,
+    frecuenciaMin: isNaN(frecuencia) ? 0 : frecuencia,
+    toleranciaMin: isNaN(tolerancia) ? 0 : tolerancia,
+    diasSemana: _diasRondaSel.slice().sort(function (a, b) { return a - b; }),
+    fechaActualizacion: new Date().toISOString()
+  };
+  btn.disabled = true; var orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+  try {
+    var res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos/${id}/rondas/config.json`), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Error al guardar el horario');
+    registrarAuditoria('RONDA_CONFIG_EDITADA', `objetivos/${id}`, { activo: activo, horaInicio: horaInicio, horaFin: horaFin });
+    alert('Horario de ronda guardado.');
+  } catch (err) {
+    alert('No se pudo guardar el horario: ' + err.toString());
+  } finally {
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
+
+function usarGPSPunto() {
+  if (!navigator.geolocation) { infoPuntoRonda('Este navegador no permite obtener la ubicacion GPS.', 'error'); return; }
+  var btn = document.getElementById('btnGPSPunto');
+  var orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Obteniendo...';
+  navigator.geolocation.getCurrentPosition(function (pos) {
+    document.getElementById('puntoLat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('puntoLng').value = pos.coords.longitude.toFixed(6);
+    infoPuntoRonda('GPS actual tomado. Precision aprox: ' + Math.round(pos.coords.accuracy) + ' m.', 'ok');
+    btn.disabled = false; btn.innerHTML = orig;
+  }, function (err) {
+    var m = 'No se pudo obtener la ubicacion GPS.';
+    if (err.code === 1) m = 'El navegador bloqueo la ubicacion. Permiti el acceso para este sitio.';
+    infoPuntoRonda(m, 'error');
+    btn.disabled = false; btn.innerHTML = orig;
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+}
+
+async function agregarPuntoRonda() {
+  var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
+  if (!id) return alert('Primero guarda el objetivo.');
+  var idPunto = (document.getElementById('puntoEditandoId').value || '').trim();
+  var nombre = (document.getElementById('puntoNombre').value || '').trim();
+  var lat = Number(document.getElementById('puntoLat').value);
+  var lng = Number(document.getElementById('puntoLng').value);
+  var radio = parseInt(document.getElementById('puntoRadio').value, 10);
+  var precision = parseInt(document.getElementById('puntoPrecision').value, 10);
+  var foto = !!document.getElementById('puntoFoto').checked;
+  if (!nombre) { infoPuntoRonda('Pone un nombre al punto.', 'error'); return; }
+  if (!validarCoordenadas(lat, lng)) { infoPuntoRonda('El punto necesita coordenadas validas. Usa el GPS o cargalas a mano.', 'error'); return; }
+  if (isNaN(radio) || radio < 5) radio = 30;
+  if (isNaN(precision) || precision < 5) precision = 50;
+  var btn = document.getElementById('btnAgregarPunto');
+  btn.disabled = true; var orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+  try {
+    if (idPunto) {
+      var prev = _puntosRondaActual[idPunto] || {};
+      var cuerpoEdit = {
+        nombre: nombre, lat: lat, lng: lng, radioMetros: radio, precisionGpsMin: precision,
+        fotoObligatoria: foto, token: prev.token || generarTokenPunto(),
+        orden: (prev.orden != null) ? prev.orden : (Object.keys(_puntosRondaActual).length + 1),
+        activo: (prev.activo !== false), fechaActualizacion: new Date().toISOString()
+      };
+      var resE = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos/${id}/rondas/puntos/${idPunto}.json`), {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpoEdit)
+      });
+      if (!resE.ok) throw new Error('Error al actualizar el punto');
+      registrarAuditoria('RONDA_PUNTO_EDITADO', `objetivos/${id}`, { idPunto: idPunto, nombre: nombre });
+    } else {
+      var cuerpoNuevo = {
+        nombre: nombre, lat: lat, lng: lng, radioMetros: radio, precisionGpsMin: precision,
+        fotoObligatoria: foto, token: generarTokenPunto(),
+        orden: Object.keys(_puntosRondaActual).length + 1,
+        activo: true, timestamp: new Date().toISOString()
+      };
+      var resN = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos/${id}/rondas/puntos.json`), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpoNuevo)
+      });
+      if (!resN.ok) throw new Error('Error al guardar el punto');
+      registrarAuditoria('RONDA_PUNTO_CREADO', `objetivos/${id}`, { nombre: nombre });
+    }
+    cancelarEdicionPunto();
+    await cargarRondaObjetivo(id);
+    infoPuntoRonda('Punto guardado. Ya podes generar su QR en la lista.', 'ok');
+  } catch (err) {
+    infoPuntoRonda('No se pudo guardar el punto: ' + err.toString(), 'error');
+  } finally {
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
+
+function editarPuntoRonda(idPunto) {
+  var p = _puntosRondaActual[idPunto];
+  if (!p) return;
+  document.getElementById('puntoEditandoId').value = idPunto;
+  document.getElementById('puntoNombre').value = p.nombre || '';
+  document.getElementById('puntoLat').value = (p.lat != null) ? p.lat : '';
+  document.getElementById('puntoLng').value = (p.lng != null) ? p.lng : '';
+  document.getElementById('puntoRadio').value = (p.radioMetros != null) ? p.radioMetros : '';
+  document.getElementById('puntoPrecision').value = (p.precisionGpsMin != null) ? p.precisionGpsMin : '';
+  document.getElementById('puntoFoto').checked = p.fotoObligatoria === true;
+  document.getElementById('btnAgregarPuntoTexto').textContent = 'Guardar cambios';
+  document.getElementById('tituloFormPunto').textContent = 'Editar punto de control';
+  document.getElementById('btnCancelarEdicionPunto').classList.remove('hidden');
+  var sec = document.getElementById('seccionRondas'); if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function eliminarPuntoRonda(idPunto) {
+  var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
+  if (!id || !idPunto) return;
+  var p = _puntosRondaActual[idPunto] || {};
+  if (!confirm('Eliminar el punto "' + (p.nombre || idPunto) + '"? El QR impreso dejara de servir.')) return;
+  try {
+    var res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos/${id}/rondas/puntos/${idPunto}.json`), { method: 'DELETE' });
+    if (!res.ok) throw new Error('Error al eliminar');
+    registrarAuditoria('RONDA_PUNTO_ELIMINADO', `objetivos/${id}`, { idPunto: idPunto, nombre: p.nombre || '' });
+    await cargarRondaObjetivo(id);
+  } catch (err) {
+    alert('No se pudo eliminar el punto: ' + err.toString());
+  }
+}
+
+function renderPuntosRonda(puntos) {
+  var cuerpo = document.getElementById('cuerpoPuntosRonda');
+  if (!cuerpo) return;
+  var ids = Object.keys(puntos || {});
+  if (ids.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-500">Sin puntos cargados.</td></tr>';
+    return;
+  }
+  ids.sort(function (a, b) { return (puntos[a].orden || 0) - (puntos[b].orden || 0); });
+  cuerpo.innerHTML = '';
+  ids.forEach(function (idPunto, i) {
+    var p = puntos[idPunto];
+    var tr = document.createElement('tr');
+    tr.className = 'border-t border-slate-800 hover:bg-slate-800/40 transition';
+    var foto = p.fotoObligatoria === true
+      ? '<span class="text-amber-400"><i class="fa-solid fa-camera"></i> foto</span>'
+      : '<span class="text-slate-500">sin foto</span>';
+    tr.innerHTML =
+      '<td class="p-3 text-slate-400 font-mono">' + (i + 1) + '</td>' +
+      '<td class="p-3"><div class="font-medium text-white">' + escaparHtml(p.nombre || '') + '</div>' +
+        '<div class="text-xs text-slate-500 font-mono">' + (p.lat != null ? formatearCoordenada(p.lat) : '?') + ', ' + (p.lng != null ? formatearCoordenada(p.lng) : '?') + '</div></td>' +
+      '<td class="p-3 text-xs text-slate-300">' + (p.radioMetros || 30) + ' m &middot; ' + foto + '</td>' +
+      '<td class="p-3 text-center whitespace-nowrap">' +
+        '<button data-accion="mostrarQRPunto" data-a1="' + escaparHtml(idPunto) + '" class="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1 mr-1" title="Ver / imprimir QR"><i class="fa-solid fa-qrcode"></i> QR</button>' +
+        '<button data-accion="editarPuntoRonda" data-a1="' + escaparHtml(idPunto) + '" class="bg-sky-600/20 text-sky-400 hover:bg-sky-600/40 border border-sky-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1 mr-1" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>' +
+        '<button data-accion="eliminarPuntoRonda" data-a1="' + escaparHtml(idPunto) + '" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600/40 border border-rose-500/30 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1" title="Eliminar"><i class="fa-solid fa-trash"></i></button>' +
+      '</td>';
+    cuerpo.appendChild(tr);
+  });
+}
+
+// Contenido del QR: VIGIX1|idObjetivo|idPunto|token
+function payloadQRPunto(idObjetivo, idPunto, token) {
+  return 'VIGIX1|' + idObjetivo + '|' + idPunto + '|' + token;
+}
+
+async function mostrarQRPunto(idPunto) {
+  var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
+  var p = _puntosRondaActual[idPunto];
+  if (!id || !p) return;
+  var nombreObj = document.getElementById('editNombreObjetivo').value || 'Objetivo';
+  var payload = payloadQRPunto(id, idPunto, p.token || '');
+  _qrPuntoActual = { idPunto: idPunto, nombre: p.nombre || '', payload: payload };
+  document.getElementById('qrObjetivoNombre').textContent = nombreObj;
+  document.getElementById('qrPuntoNombre').textContent = p.nombre || '';
+  document.getElementById('qrPayloadTexto').textContent = payload;
+  var cont = document.getElementById('qrContenedor');
+  cont.innerHTML = '<p class="text-xs">Generando QR...</p>';
+  document.getElementById('modalQRPunto').classList.remove('hidden');
+  try {
+    await lazyQR();
+    cont.innerHTML = '';
+    new QRCode(cont, { text: payload, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+  } catch (err) {
+    cont.innerHTML = '<p class="text-xs text-rose-500">No se pudo generar el QR. Revisa tu conexion.</p>';
+  }
+}
+
+function cerrarModalQRPunto() {
+  document.getElementById('modalQRPunto').classList.add('hidden');
+  var cont = document.getElementById('qrContenedor'); if (cont) cont.innerHTML = '';
+  _qrPuntoActual = null;
+}
+
+function _canvasQRActual() {
+  var cont = document.getElementById('qrContenedor');
+  return cont ? cont.querySelector('canvas') : null;
+}
+
+function descargarQRPunto() {
+  var canvas = _canvasQRActual();
+  if (!canvas || !_qrPuntoActual) { alert('Espera a que el QR termine de generarse.'); return; }
+  try {
+    var url = canvas.toDataURL('image/png');
+    var a = document.createElement('a');
+    var nombre = (_qrPuntoActual.nombre || 'punto').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    a.href = url; a.download = 'qr_' + nombre + '.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } catch (err) {
+    alert('No se pudo descargar el PNG: ' + err.toString());
+  }
+}
+
+function imprimirQRPunto() {
+  if (!_canvasQRActual()) { alert('Espera a que el QR termine de generarse.'); return; }
+  document.body.classList.add('print-qr');
+  var limpiar = function () { document.body.classList.remove('print-qr'); window.removeEventListener('afterprint', limpiar); };
+  window.addEventListener('afterprint', limpiar);
+  setTimeout(function () { try { window.print(); } catch (e) {} setTimeout(limpiar, 1500); }, 50);
+}
+
 function initInlineHandlers() {
   document.getElementById("formValidarPass").addEventListener("submit", function(e) { validarPasswordAdmin(e) });
   document.getElementById("btnRecargar").addEventListener("click", function(e) { recargarDatosEfectivo() });
@@ -2709,6 +3397,12 @@ function initInlineHandlers() {
   document.getElementById("tabBtnObjetivos").addEventListener("click", function(e) { cambiarTab('objetivos') });
   document.getElementById("tabBtnDispositivos").addEventListener("click", function(e) { cambiarTab('dispositivos') });
   document.getElementById("tabBtnConfiguracion").addEventListener("click", function(e) { cambiarTab('configuracion') });
+  { var _b = document.getElementById("tabBtnRondasReporte"); if (_b) _b.addEventListener("click", function(e) { cambiarTab('rondasReporte') }); }
+  { var _r = document.getElementById("btnActualizarReporteRondas"); if (_r) _r.addEventListener("click", function(e) { cargarReporteRondas() }); }
+  { var _fo = document.getElementById("filtroObjetivoRonda"); if (_fo) _fo.addEventListener("change", function(e) { renderReporteRondas() }); }
+  { var _ff = document.getElementById("filtroFechaRonda"); if (_ff) _ff.addEventListener("change", function(e) { renderReporteRondas() }); }
+  { var _fl = document.getElementById("filtroLegajoRonda"); if (_fl) _fl.addEventListener("keyup", function(e) { renderReporteRondas() }); }
+  { var _bl = document.getElementById("btnLimpiarFiltrosRonda"); if (_bl) _bl.addEventListener("click", function(e) { limpiarFiltrosRonda() }); }
   document.getElementById("inputBusqueda").addEventListener("keyup", function(e) { filtrarTablaMarcaciones() });
   document.getElementById("filtroAuditoria").addEventListener("change", function(e) { filtrarTablaMarcaciones() });
   document.getElementById("filtroTipo").addEventListener("change", function(e) { filtrarTablaMarcaciones() });
@@ -2754,7 +3448,21 @@ function initInlineHandlers() {
   document.getElementById("btnGPSEditar").addEventListener("click", function(e) { usarGPSObjetivo('editar') });
   document.getElementById("btnCerrarObj2").addEventListener("click", function(e) { cerrarModalEditarObjetivo() });
   document.getElementById("btnGuardarEdicionObjetivo").addEventListener("click", function(e) { guardarEdicionObjetivo() });
+  // --- Sistema de Rondas con QR (Paso 1) ---
+  var _bCfg = document.getElementById("btnGuardarConfigRonda"); if (_bCfg) _bCfg.addEventListener("click", function(e) { guardarConfigRonda() });
+  var _bGPSp = document.getElementById("btnGPSPunto"); if (_bGPSp) _bGPSp.addEventListener("click", function(e) { usarGPSPunto() });
+  var _bAddP = document.getElementById("btnAgregarPunto"); if (_bAddP) _bAddP.addEventListener("click", function(e) { agregarPuntoRonda() });
+  var _bCanP = document.getElementById("btnCancelarEdicionPunto"); if (_bCanP) _bCanP.addEventListener("click", function(e) { cancelarEdicionPunto() });
+  var _bCerQR = document.getElementById("btnCerrarQR"); if (_bCerQR) _bCerQR.addEventListener("click", function(e) { cerrarModalQRPunto() });
+  var _bDescQR = document.getElementById("btnDescargarQR"); if (_bDescQR) _bDescQR.addEventListener("click", function(e) { descargarQRPunto() });
+  var _bImpQR = document.getElementById("btnImprimirQR"); if (_bImpQR) _bImpQR.addEventListener("click", function(e) { imprimirQRPunto() });
   document.getElementById("btnCerrarAlertas").addEventListener("click", function(e) { cerrarModalAlertasFichadas() });
   document.getElementById("btnNotifNav").addEventListener("click", function(e) { solicitarNotificacionesNavegador() });
   document.getElementById("btnMarcarVistas2").addEventListener("click", function(e) { marcarTodasAlertasFichadasVistas() });
+  // Comprobante de PIN (mostrar una sola vez): botones del modal.
+  var _cbCerrar = document.getElementById("btnCerrarComprobante"); if (_cbCerrar) _cbCerrar.addEventListener("click", function(e) { cerrarComprobantePin() });
+  var _cbCerrar2 = document.getElementById("btnCerrarComprobante2"); if (_cbCerrar2) _cbCerrar2.addEventListener("click", function(e) { cerrarComprobantePin() });
+  var _cbPDF = document.getElementById("btnComprobantePDF"); if (_cbPDF) _cbPDF.addEventListener("click", function(e) { descargarComprobantePinPDF() });
+  var _cbImp = document.getElementById("btnComprobanteImprimir"); if (_cbImp) _cbImp.addEventListener("click", function(e) { imprimirComprobantePin() });
+  var _cbCop = document.getElementById("btnComprobanteCopiar"); if (_cbCop) _cbCop.addEventListener("click", function(e) { copiarComprobantePin() });
 }
