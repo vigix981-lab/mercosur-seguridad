@@ -475,7 +475,7 @@ body>header .max-w-7xl>div:first-child::before{
   display:block;
   width:205px;
   height:68px;
-  background:url("assets/vigix-logo.svg") left center/contain no-repeat;
+  background:url("assets/vigix-logo-prod.webp") left center/contain no-repeat;
 }
 #pantallaLogin{
   min-height:calc(100vh - 92px);
