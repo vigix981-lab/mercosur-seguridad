@@ -449,3 +449,73 @@ a{color:inherit;text-decoration:inherit}
   body.print-comprobante #modalComprobantePin .comprobante-card .border{border-color:#000!important}
   body.print-comprobante #modalComprobantePin #comprobantePin{color:#000!important}
 }
+
+
+/* === Frente visual Vigix 2026-10-04 ===
+   Presentacion visual únicamente; no modifica formularios ni lógica. */
+body{
+  background-color:#05070b;
+  background-image:linear-gradient(rgba(0,0,0,.16),rgba(0,0,0,.30)),url("assets/vigix-bg.jpg");
+  background-size:cover;
+  background-position:center center;
+  background-attachment:fixed;
+  background-repeat:no-repeat;
+}
+body>header{
+  background:rgba(2,6,23,.90)!important;
+  border-bottom-color:rgba(239,68,68,.35)!important;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+body>header .text-emerald-400.uppercase{
+  font-size:0!important;
+}
+body>header .text-emerald-400.uppercase::after{
+  content:"Vigix";
+  font-size:10px;
+  letter-spacing:.1em;
+  color:rgb(248 113 113 / 1);
+}
+#pantallaLogin{
+  background:transparent;
+  min-height:calc(100vh - 92px);
+}
+#pantallaLogin>div{
+  background:rgba(10,14,22,.90)!important;
+  border-color:rgba(239,68,68,.48)!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.58),0 0 0 1px rgba(239,68,68,.10);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+#pantallaLogin>div>div:first-child h1{
+  font-size:0!important;
+}
+#pantallaLogin>div>div:first-child h1::before{
+  content:"";
+  display:block;
+  width:240px;
+  height:86px;
+  margin:0 auto 12px;
+  background-image:url("assets/vigix-bg.jpg");
+  background-repeat:no-repeat;
+  background-size:800px 450px;
+  background-position:-42px -10px;
+  border-radius:10px;
+}
+#pantallaLogin>div>div:first-child h1::after{
+  content:"Control operativo y asistencia";
+  display:block;
+  font-size:1.5rem;
+  line-height:2rem;
+  font-weight:700;
+  color:#fff;
+}
+@media(max-width:768px){
+  body{background-attachment:scroll;background-position:center top;}
+  body>header{background:rgba(2,6,23,.95)!important;}
+  #pantallaLogin{min-height:auto;padding-top:20px;padding-bottom:28px;}
+  #pantallaLogin>div{background:rgba(10,14,22,.94)!important;}
+  #pantallaLogin>div>div:first-child h1::before{
+    width:210px;height:76px;background-size:700px 394px;background-position:-36px -8px;
+  }
+}
