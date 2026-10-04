@@ -109,7 +109,7 @@ button,input,textarea{font:inherit}
 .hero-content{
   width:min(var(--max),calc(100% - 40px));
   margin:0 auto;
-  padding:86px 0 98px;
+  padding:72px 0 84px;
 }
 
 .eyebrow{
@@ -122,26 +122,26 @@ button,input,textarea{font:inherit}
 }
 
 .hero h1{
-  max-width:710px;
+  max-width:340px;
   margin:0;
-  font-size:clamp(3rem,6vw,5.4rem);
-  line-height:.96;
-  letter-spacing:-.055em;
+  font-size:clamp(2.55rem,4.2vw,3.7rem);
+  line-height:1.02;
+  letter-spacing:-.045em;
   text-wrap:balance;
 }
 
 .hero-subtitle{
-  max-width:610px;
-  margin:22px 0 0;
+  max-width:360px;
+  margin:18px 0 0;
   color:#d9dee6;
-  font-size:clamp(1.05rem,2vw,1.25rem);
+  font-size:clamp(1rem,1.5vw,1.12rem);
 }
 
 .hero-actions{
   display:flex;
   flex-wrap:wrap;
-  gap:12px;
-  margin-top:30px;
+  gap:10px;
+  margin-top:24px;
 }
 
 .btn{
@@ -291,6 +291,13 @@ button,input,textarea{font:inherit}
   margin:0;
   font-size:2rem;
   letter-spacing:-.035em;
+}
+
+.plan-summary{
+  max-width:320px;
+  margin:10px 0 0;
+  color:var(--muted);
+  font-size:.92rem;
 }
 
 .plan-card ul{
@@ -491,22 +498,24 @@ textarea{
   }
 
   .hero{
-    min-height:570px;
-    background-position:62% center;
+    min-height:550px;
+    background-position:18% center;
   }
 
   .hero-content{
     width:calc(100% - 30px);
-    padding:70px 0 78px;
+    padding:54px 0 64px;
   }
 
   .hero h1{
-    max-width:540px;
-    font-size:clamp(2.65rem,13vw,4rem);
+    max-width:310px;
+    font-size:clamp(2.25rem,10.5vw,3rem);
+    line-height:1.04;
   }
 
   .hero-subtitle{
-    max-width:88%;
+    max-width:320px;
+    margin-top:16px;
   }
 
   .hero-actions{
@@ -552,8 +561,17 @@ textarea{
   }
 
   .hero{
-    min-height:540px;
-    background-position:66% center;
+    min-height:520px;
+    background-position:left center;
+  }
+
+  .hero h1{
+    max-width:290px;
+    font-size:clamp(2.1rem,10vw,2.65rem);
+  }
+
+  .hero-subtitle{
+    max-width:290px;
   }
 
   .hero-actions{
