@@ -58,8 +58,9 @@ button,input,textarea{font:inherit}
 }
 
 .brand img{
-  width:186px;
-  height:56px;
+  width:190px;
+  height:auto;
+  max-height:58px;
   object-fit:contain;
   object-position:left center;
 }
@@ -102,7 +103,7 @@ button,input,textarea{font:inherit}
   background:
     linear-gradient(90deg,rgba(3,6,10,.92) 0%,rgba(3,6,10,.73) 36%,rgba(3,6,10,.34) 61%,rgba(3,6,10,.18) 100%),
     linear-gradient(180deg,rgba(0,0,0,.05) 55%,rgba(5,7,11,.72) 100%),
-    url("https://images.pexels.com/photos/30692441/pexels-photo-30692441.jpeg?auto=compress&cs=tinysrgb&w=1920")
+    url("assets/vigix-bg-prod.webp")
     center/cover no-repeat;
 }
 
