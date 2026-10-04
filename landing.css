@@ -298,3 +298,72 @@ textarea{resize:vertical}
   .system-link{font-size:.78rem}
   .hero-actions{grid-template-columns:1fr}
 }
+
+
+/* === Vigix landing polish 2026-10-04 === */
+.brand img{
+  width:220px;
+  height:74px;
+  object-fit:contain;
+  object-position:left center;
+}
+.hero-stage{
+  min-height:600px;
+  background:
+    linear-gradient(90deg,rgba(3,5,9,.60),rgba(3,5,9,.28) 50%,rgba(3,5,9,.60)),
+    linear-gradient(180deg,rgba(30,0,4,.10),rgba(5,7,11,.54)),
+    url("https://images.pexels.com/photos/19317897/pexels-photo-19317897.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop")
+    center/cover no-repeat;
+}
+.hero-shade{
+  background:
+    radial-gradient(circle at 50% 38%,rgba(239,38,56,.10),transparent 34%),
+    linear-gradient(180deg,rgba(0,0,0,.02) 45%,rgba(5,7,11,.72) 100%);
+}
+.hero-inner{padding:42px 0 26px}
+.hero-copy{
+  max-width:700px;
+  margin:0 auto;
+  padding:25px 30px 27px;
+  text-align:center;
+  border:1px solid rgba(239,38,56,.50);
+  border-radius:18px;
+  background:rgba(6,9,14,.78);
+  box-shadow:0 24px 70px rgba(0,0,0,.42);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.hero-copy h1{
+  max-width:640px;
+  margin-left:auto;
+  margin-right:auto;
+  font-size:clamp(2.65rem,4.8vw,4.55rem);
+  line-height:.98;
+}
+.hero-subtitle{
+  max-width:610px;
+  margin-left:auto;
+  margin-right:auto;
+}
+.hero-actions{justify-content:center;margin-top:22px}
+.plans-dock{margin-top:24px;gap:12px}
+.plan-card{
+  min-height:176px;
+  padding:17px 18px;
+  background:rgba(7,10,15,.89);
+  border-color:rgba(255,255,255,.16);
+}
+.plan-featured{border-color:rgba(239,38,56,.78)}
+.plan-card>p{margin-bottom:10px}
+.section{padding-top:48px;padding-bottom:48px}
+.compact-section{padding-top:46px;padding-bottom:46px}
+.contact-section{padding-top:44px;padding-bottom:52px}
+@media(max-width:700px){
+  .brand img{width:168px;height:56px}
+  .hero-stage{background-position:58% center}
+  .hero-inner{padding:28px 0 22px}
+  .hero-copy{padding:22px 18px 24px;text-align:left}
+  .hero-copy h1,.hero-subtitle{margin-left:0;margin-right:0}
+  .hero-actions{justify-content:flex-start}
+  .plan-card{min-height:auto}
+}
