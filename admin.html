@@ -631,7 +631,9 @@
     <div id="tabDispositivos" class="hidden space-y-6">
 
       <!-- HABILITACION GLOBAL DEL MODO OFFLINE -->
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl max-w-2xl">
+      <!-- [PLAN] data-plan-funcion="modoOffline": aplicarFuncionesUI() oculta esta
+           tarjeta si el plan no incluye el fichaje offline. -->
+      <div data-plan-funcion="modoOffline" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl max-w-2xl">
         <div class="flex items-center gap-3 mb-1">
           <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-lg"></i>
           <h3 class="font-bold text-white text-base">Fichaje sin conexión (offline)</h3>
@@ -1082,7 +1084,7 @@
       <!--  SISTEMA DE RONDAS CON QR - Paso 1 (admin): horario + puntos de control -->
       <!--  Aditivo: solo aparece al editar un objetivo. No altera la logica previa.-->
       <!-- ===================================================================== -->
-      <div id="seccionRondas" class="border-t border-slate-700 pt-2 space-y-4">
+      <div id="seccionRondas" data-plan-funcion="rondas" class="border-t border-slate-700 pt-2 space-y-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-center text-emerald-400">
             <i class="fa-solid fa-route"></i>

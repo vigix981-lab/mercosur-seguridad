@@ -1090,6 +1090,19 @@ window.guardarModoDispositivo = guardarModoDispositivo;
 async function guardarConfigOffline() {
   const estado = document.getElementById('cfgEstadoOffline');
   const habilitado = !!document.getElementById('cfgOfflineHabilitado').checked;
+  // [PLAN] Guia amable: el fichaje offline solo esta disponible si el plan
+  // contratado incluye la funcion 'modoOffline'. Si se intenta ACTIVAR sin plan,
+  // avisamos y revertimos el check (apagarlo siempre se permite). Aunque alguien
+  // sortee esta guia, las Reglas de Firebase rechazan la escritura server-side.
+  if (habilitado && !planTieneFuncion('modoOffline')) {
+    const chk = document.getElementById('cfgOfflineHabilitado');
+    if (chk) chk.checked = false;
+    if (estado) {
+      estado.className = 'text-xs text-amber-400 font-semibold';
+      estado.innerText = 'El fichaje offline no esta incluido en tu plan actual. Escribinos para sumar esta funcion.';
+    }
+    return;
+  }
   const ventana = Math.max(1, Math.min(720, parseInt(document.getElementById('cfgVentanaLoteOffline').value, 10) || 168));
   // Clave nueva (#5): tolerancia de reloj del dispositivo al sincronizar (seg).
   const skEl = document.getElementById('cfgSkewRelojOffline');
@@ -3294,6 +3307,13 @@ function renderErrorPuntosRonda(id) {
 async function guardarConfigRonda() {
   var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
   if (!id) return alert('Primero guarda el objetivo.');
+  // [PLAN] Guia amable: el control de rondas requiere la funcion 'rondas' del
+  // plan. Si no esta incluida, avisamos y no intentamos escribir (las Reglas de
+  // Firebase igualmente rechazan la config de rondas sin plan).
+  if (!planTieneFuncion('rondas')) {
+    alert('El control de rondas no esta incluido en tu plan actual. Escribinos para sumar esta funcion y configurar los recorridos.');
+    return;
+  }
   var btn = document.getElementById('btnGuardarConfigRonda');
   var horaInicio = (document.getElementById('rondaHoraInicio').value || '').trim();
   var horaFin = (document.getElementById('rondaHoraFin').value || '').trim();
@@ -3342,6 +3362,13 @@ function usarGPSPunto() {
 async function agregarPuntoRonda() {
   var id = document.getElementById('editObjetivoId').value || objetivoEditandoId;
   if (!id) return alert('Primero guarda el objetivo.');
+  // [PLAN] Guia amable: agregar puntos de ronda requiere la funcion 'rondas'.
+  // Si el plan no la incluye, avisamos y abortamos (las Reglas de Firebase
+  // tambien bloquean la escritura del punto server-side).
+  if (!planTieneFuncion('rondas')) {
+    infoPuntoRonda('El control de rondas no esta incluido en tu plan actual. Escribinos para habilitar los recorridos.', 'error');
+    return;
+  }
   var idPunto = (document.getElementById('puntoEditandoId').value || '').trim();
   var nombre = (document.getElementById('puntoNombre').value || '').trim();
   var lat = Number(document.getElementById('puntoLat').value);
