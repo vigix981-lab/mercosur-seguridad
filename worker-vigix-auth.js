@@ -6,14 +6,14 @@
  * account (con permisos de Auth Admin) para hacerlo de forma segura.
  *
  * SEGURIDAD (no tocar):
- *  - Solo acepta pedidos desde ALLOWED_ORIGIN (tu GitHub Pages).
+ *  - Solo acepta pedidos desde ALLOWED_ORIGIN (origen público autorizado de la instancia).
  *  - Verifica criptográficamente el idToken de quien pide (Firebase RS256).
  *  - Exige que ese usuario tenga rol 'admin' en /usuarios/<uid>.
  *  - La clave de la service account vive SOLO como secreto (env), nunca en el código.
  *
  * VARIABLES DE ENTORNO a configurar en Cloudflare:
  *  - SERVICE_ACCOUNT  (SECRETO)  -> el JSON COMPLETO de la cuenta de servicio.
- *  - ALLOWED_ORIGIN              -> https://micasa27822024-netizen.github.io
+ *  - ALLOWED_ORIGIN              -> https://vigix.com.ar (valor esperado para Vigix master; verificar el valor desplegado antes de publicar)
  *  - RTDB_URL                    -> https://mercosur-seguridad-default-rtdb.firebaseio.com
  *  - FIREBASE_WEB_API_KEY        -> la Web API Key del proyecto (NO es secreto;
  *                                  es la misma clave publica del firebaseConfig
