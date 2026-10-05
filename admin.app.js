@@ -576,7 +576,7 @@ function cerrarComprobantePin() {
 function copiarComprobantePin() {
   if (!_comprobantePinActual) return;
   const d = _comprobantePinActual;
-  const texto = 'Acceso Mercosur Seguridad / Vigix\n'
+  const texto = 'Acceso Vigix - Control operativo y asistencia\n'
     + 'Nombre: ' + d.nombre + '\n'
     + 'Legajo: ' + d.legajo + '\n'
     + 'PIN: ' + d.pin + '\n'

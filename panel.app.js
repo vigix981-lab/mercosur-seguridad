@@ -1035,7 +1035,7 @@ function exportarPdfSupervisor() {
 
   doc.setFontSize(14);
   doc.setTextColor(15, 23, 42);
-  doc.text("Mercosur Seguridad - Reporte de Horas por Empleado", 14, 15);
+  doc.text("Vigix - Control operativo y asistencia - Reporte de Horas por Empleado", 14, 15);
 
   doc.setFontSize(10);
   doc.setTextColor(71, 85, 105);
