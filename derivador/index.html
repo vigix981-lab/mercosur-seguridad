@@ -1,1 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Acceso Vigix: ingresá el código de tu empresa y te llevamos a tu plataforma.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'">
+  <title>Vigix | Acceso</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#" aria-label="Vigix">
+        <img src="assets/vigix-logo-prod.webp" alt="Vigix" width="120" height="34">
+      </a>
+      <span class="header-tag">Acceso</span>
+    </div>
+  </header>
 
+  <main class="wrap">
+    <section class="card" aria-labelledby="titulo">
+      <p class="eyebrow">Control operativo y asistencia</p>
+      <h1 id="titulo">Ingresá a tu empresa</h1>
+      <p class="subtitle">Escribí el <strong>código de acceso</strong> que te dimos y te llevamos a la plataforma de tu empresa. El usuario y PIN se cargan ya dentro de tu plataforma.</p>
+
+      <div class="ultima" id="ultima" hidden>
+        <span class="ultima-label">Último acceso</span>
+        <button type="button" class="btn btn-ghost" id="btn-ultima"></button>
+      </div>
+
+      <form id="form-portal" autocomplete="off" novalidate>
+        <label class="field-label" for="codigo">Código de acceso</label>
+        <input class="field" type="text" id="codigo" name="codigo" placeholder="ej. demo-asistencia" aria-describedby="ayuda" spellcheck="false" autocapitalize="off" inputmode="latin" maxlength="63">
+        <p class="ayuda" id="ayuda">Es el código exclusivo de tu empresa. Si no lo tenés, pedíselo a tu administrador.</p>
+        <button type="submit" class="btn btn-primary" id="btn-entrar">Entrar</button>
+      </form>
+
+      <p class="estado" id="estado" role="status" hidden></p>
+    </section>
+
+    <p class="foot">Vigix &middot; Cada empresa opera con su propio entorno seguro.</p>
+  </main>
+
+  <script src="portal.app.js" defer></script>
+</body>
+</html>
