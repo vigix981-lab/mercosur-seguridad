@@ -238,6 +238,11 @@ button,input{font:inherit}
   background:rgba(237,31,54,.1);
   color:#ffd9df;
 }
+.estado-ok{
+  border-color:rgba(46,204,113,.4);
+  background:rgba(46,204,113,.1);
+  color:#d4fce6;
+}
 
 .foot{
   margin:22px 0 0;
