@@ -2,14 +2,14 @@
   "version": 1,
   "empresas": [
     {
-      "codigo": "mercosur",
+      "codigo": "2782",
       "nombre": "Mercosur Seguridad",
       "url": "https://vigix.com.ar/fichadas.html",
       "activa": true
     },
     {
-      "codigo": "vga-sevurity-24",
-      "nombre": "Seguridad del Sur",
+      "codigo": "27822022",
+      "nombre": "vga-sevurity-24",
       "url": "https://vga-security-24.vigix.com.ar/fichadas.html",
       "activa": true
     }
