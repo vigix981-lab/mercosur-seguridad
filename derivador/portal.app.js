@@ -17,7 +17,7 @@
 
   // --- Configuracion -------------------------------------------------------
   // Dominio base donde cuelgan los subdominios de cada empresa.
-  var DOMINIO_BASE = "vigix.com.ar";
+  var DOMINIO_BASE = "vigix.com.ar/fichadas.html";
   // Ruta a la que entra el cliente dentro de su plataforma.
   // "" = raiz del subdominio (su index.html). Si queres mandarlo directo a la
   // pantalla de fichada, pone "fichadas.html".
