@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
   <meta name="google-site-verification" content="Vl8Ej5B1y5JLxgMQrBharykDtYZNBj6i1WQ4OnN8KnM" />
   <meta name="description" content="Vigix: control operativo, fichadas, rondas y supervisión para empresas de seguridad.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'sha256-P+CGYl0GUxSD6ZIvPYnNi62AcBsF96UQ6gCn4JYcQKM='; style-src 'self'; img-src 'self' https://images.pexels.com; form-action 'self'; frame-ancestors 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'sha256-P+CGYl0GUxSD6ZIvPYnNi62AcBsF96UQ6gCn4JYcQKM=' 'sha256-ozTkfRlVlrBmF/CUFVtfAsmUMiMgXJsTEwLv4/WprPo='; style-src 'self'; img-src 'self' https://images.pexels.com; form-action 'self'; frame-ancestors 'none'">
   <link rel="canonical" href="https://vigix.com.ar/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Vigix">
@@ -152,8 +152,7 @@
         <p>Dejá los datos básicos de tu operación para preparar una propuesta adecuada.</p>
       </div>
 
-      <!-- El envío permanece deshabilitado hasta definir y verificar el canal comercial oficial. -->
-      <form class="contact-form" action="#" method="post" onsubmit="return false">
+      <form class="contact-form" action="#" method="post">
         <div class="field-grid">
           <label>
             <span>Nombre y apellido</span>
@@ -180,8 +179,8 @@
             <textarea name="consulta" rows="5"></textarea>
           </label>
         </div>
-        <button class="btn btn-primary contact-submit" type="button" disabled aria-disabled="true">Enviar consulta</button>
-        <p class="form-note">El envío se habilitará cuando exista un canal comercial verificado. Consultá nuestra <a href="privacidad.html">Política de privacidad</a>.</p>
+        <button class="btn btn-primary contact-submit" type="submit">Enviar consulta</button>
+        <p class="form-note">El formulario abre WhatsApp; confirmás allí el envío. Consultas: <a href="https://wa.me/5491167083232">WhatsApp comercial</a> o <a href="mailto:vigix.soluciones@gmail.com">correo</a>. Soporte: <a href="https://wa.me/5491126127065">WhatsApp técnico</a>. Consultá nuestra <a href="privacidad.html">Política de privacidad</a>.</p>
       </form>
     </section>
   </main>
@@ -193,5 +192,6 @@
       <a href="terminos.html">Términos de uso</a>
     </div>
   </footer>
+  <script>(()=>{const f=document.querySelector('.contact-form');if(!f)return;f.addEventListener('submit',e=>{e.preventDefault();if(!f.reportValidity())return;const d=new FormData(f);const items=[['Nombre',d.get('nombre')],['Empresa',d.get('empresa')],['Teléfono',d.get('telefono')],['Email',d.get('email')],['Personal',d.get('personal')],['Consulta',d.get('consulta')]];const body='Consulta comercial Vigix\n'+items.filter(x=>String(x[1]||'').trim()).map(x=>x[0]+': '+String(x[1]).trim()).join('\n');window.open('https://wa.me/5491167083232?text='+encodeURIComponent(body),'_blank','noopener,noreferrer');});})();</script>
 </body>
 </html>
