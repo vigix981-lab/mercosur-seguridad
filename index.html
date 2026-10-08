@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="vga security 24: control operativo, fichadas, rondas y supervisión para empresas de seguridad.">
+  <meta name="description" content="Vigix: control operativo, fichadas, rondas y supervisión para empresas de seguridad.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; style-src 'self'; img-src 'self' https://images.pexels.com; form-action 'self'; frame-ancestors 'none'">
-  <title>vga security 24 | Control operativo para empresas de seguridad</title>
+  <title>Vigix | Control operativo para empresas de seguridad</title>
   <link rel="stylesheet" href="landing.css">
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a class="brand" href="#inicio" aria-label="vga security 24 - Inicio">
-        <img src="assets/vigix-logo-prod.webp" alt="vga security 24">
+      <a class="brand" href="#inicio" aria-label="Vigix - Inicio">
+        <img src="assets/vigix-logo-prod.webp" alt="Vigix">
       </a>
 
       <nav class="public-nav" aria-label="Navegación principal">
@@ -137,16 +137,16 @@
         <p>Dejá los datos básicos de tu operación para preparar una propuesta adecuada.</p>
       </div>
 
-      <!-- TODO: conectar este formulario únicamente cuando exista un destino comercial real y verificado. -->
+      <!-- El envío permanece deshabilitado hasta definir y verificar el canal comercial oficial. -->
       <form class="contact-form" action="#" method="post" onsubmit="return false">
         <div class="field-grid">
           <label>
             <span>Nombre y apellido</span>
-            <input type="text" name="nombre" autocomplete="name">
+            <input type="text" name="nombre" autocomplete="name" required>
           </label>
           <label>
             <span>Empresa</span>
-            <input type="text" name="empresa" autocomplete="organization">
+            <input type="text" name="empresa" autocomplete="organization" required>
           </label>
           <label>
             <span>Teléfono</span>
@@ -154,7 +154,7 @@
           </label>
           <label>
             <span>Email</span>
-            <input type="email" name="email" autocomplete="email">
+            <input type="email" name="email" autocomplete="email" required>
           </label>
           <label class="full-width">
             <span>Cantidad aproximada de personal</span>
@@ -166,16 +166,16 @@
           </label>
         </div>
         <button class="btn btn-primary contact-submit" type="button" disabled aria-disabled="true">Enviar consulta</button>
-        <p class="form-note">El envío se habilitará cuando exista un canal comercial verificado.</p>
+        <p class="form-note">El envío se habilitará cuando exista un canal comercial verificado. Consultá nuestra <a href="privacidad.html">Política de privacidad</a>.</p>
       </form>
     </section>
   </main>
 
   <footer class="site-footer">
     <p>Sistemas de control y gestión para empresas de seguridad.</p>
-    <div class="legal-placeholders" aria-label="Información legal pendiente">
-      <span>Política de privacidad</span>
-      <span>Términos de uso</span>
+    <div class="legal-placeholders" aria-label="Información legal">
+      <a href="privacidad.html">Política de privacidad</a>
+      <a href="terminos.html">Términos de uso</a>
     </div>
   </footer>
 </body>
