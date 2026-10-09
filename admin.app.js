@@ -2820,11 +2820,13 @@ async function guardarObjetivo(e) {
     }
   } catch (_) { /* si la verificación falla, se continúa: el POST a Firebase decide */ }
   try {
-    const res = await fetch(await window.urlConAuthAdmin(`${URL_FIREBASE}/objetivos.json`), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: nombreObj, direccion: direccionObj, latitud: lat, longitud: lon, estado: 'ACTIVO', timestamp: new Date().toISOString() })
+    // [#2] El alta ya NO es un POST directo a /objetivos.json (las Reglas lo
+    // bloquean: solo la service account crea objetivos). Pasa por el Worker, que
+    // revalida rol admin y aplica el tope maxObjetivos del plan server-side.
+    await window.llamarWorkerAdmin({
+      accion: 'crearObjetivo',
+      objetivo: { nombre: nombreObj, direccion: direccionObj, latitud: lat, longitud: lon, estado: 'ACTIVO' }
     });
-    if (!res.ok) throw new Error('Error al guardar en Firebase');
     alert('Objetivo registrado con éxito.');
     document.getElementById('newObjetivo').value = '';
     document.getElementById('newDireccionObjetivo').value = '';
